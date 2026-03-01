@@ -1,55 +1,37 @@
-import { NextResponse } from 'next/server';
-import { soundcharts } from '@/lib/soundcharts';
+import { NextResponse } from "next/server";
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const type = searchParams.get('type');
-  const query = searchParams.get('q');
+function isValidISRC(isrc: string) {
+  return /^[A-Z]{2}-?[A-Z0-9]{3}-?\d{2}-?\d{5}$/.test(isrc);
+}
 
-  if (!query) {
-    return NextResponse.json({ error: 'Query required' }, { status: 400 });
-  }
-
+export async function GET(req: Request) {
   try {
-    const results: any[] = [];
+    const { searchParams } = new URL(req.url);
+    const isrc = (searchParams.get("isrc") ?? "").trim();
 
-    if (type === 'artist') {
-      const artists = await soundcharts.searchArtist(query);
+    if (!isrc || !isValidISRC(isrc)) {
+      return NextResponse.json({ error: "Invalid or missing ISRC." }, { status: 400 });
+    }
 
-      if (artists.length > 0) {
-        const artist = artists[0];
-        const tracks = await soundcharts.getArtistTracks(artist.uuid, 5);
-
-        for (const track of tracks) {
-          try {
-            const royalty = await soundcharts.estimateRoyalties(track.uuid);
-            results.push({
-              track: royalty.trackName,
-              artist: royalty.artistName,
-              source: 'Soundcharts Streaming Data',
-              estimatedAmount: `$${royalty.estimatedRoyalty.toLocaleString()}`,
-              confidence: royalty.confidence,
-              isrc: royalty.isrc,
-              streams: royalty.totalStreams.toLocaleString(),
-              platforms: Object.keys(royalty.platforms).join(', ')
-            });
-          } catch (e) {
-            console.error(`Failed to estimate royalties for track ${track.uuid}:`, e);
-          }
-        }
-      }
+    let backendData = null;
+    try {
+      const fastApiRes = await fetch(
+        `http://127.0.0.1:8000/catalog/audit?isrc=${encodeURIComponent(isrc)}`,
+        { method: "GET", headers: { "Content-Type": "application/json" } }
+      );
+      backendData = fastApiRes.ok ? await fastApiRes.json() : null;
+    } catch {
+      backendData = null;
     }
 
     return NextResponse.json({
-      found: results.length,
-      items: results.slice(0, 5)
-    });
+      isrc,
+      timestamp: new Date().toISOString(),
+      sources: { backend: backendData },
+      summary: { backendFound: !!backendData },
+    }, { status: 200 });
 
-  } catch (error) {
-    console.error('Royalty finder error:', error);
-    return NextResponse.json(
-      { error: 'Search failed', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+  } catch (err) {
+    return NextResponse.json({ error: "Server error", details: String(err) }, { status: 500 });
   }
 }

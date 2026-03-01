@@ -1,0 +1,827 @@
+"use client";
+
+import Link from 'next/link';
+import { useState } from 'react';
+
+const QRCode = ({ value, size = 120 }: { value: string; size?: number }) => (
+  <img 
+    src={`https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(value)}`} 
+    alt="QR" 
+    width={size} 
+    height={size} 
+    style={{ borderRadius: '0.5rem' }} 
+  />
+);
+
+const MATTERS = [
+  { id: 1, name: "Metro Boomin - Creepin' Dispute", amount: "$187,200", status: "Urgent", leakage: "31%", issues: 5 },
+  { id: 2, name: "B.o.B Estate - 360 Deal Audit", amount: "$450,000", status: "In Progress", leakage: "22%", issues: 8 },
+  { id: 3, name: "Future - Publishing Rights", amount: "$92,500", status: "Ready", leakage: "15%", issues: 3 },
+];
+
+const nav = [
+  {
+    label: "Matter Management",
+    items: [
+      { id: "dashboard", label: "Dashboard", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
+      { id: "new-matter", label: "New Matter", icon: "M12 4v16m8-8H4" }
+    ]
+  },
+  {
+    label: "Audit & Due Diligence",
+    items: [
+      { id: "digital-handshake", label: " Digital Handshake", icon: "M12 11c1.657 0 3-1.343 3-3S13.657 5 12 5 9 6.343 9 8s1.343 3 3 3zm0 2c-2.667 0-8 1.333-8 4v2h16v-2c0-2.667-5.333-4-8-4z" },
+      { id: "run-due-diligence", label: "Run Catalog Due Diligence", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
+      { id: "pre-release-verify", label: "Pre-Release Split Verification", icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" }
+    ]
+  },
+  {
+    label: "Reports & Documents",
+    items: [
+      { id: "view-audit-report", label: "View Audit Report", icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" },
+      { id: "generate-court-report", label: "Generate Court-Ready Report", icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" },
+      { id: "generate-custom-report", label: "Generate Custom Report", icon: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" }
+    ]
+  },
+  {
+    label: "Legal Actions",
+    items: [
+      { id: "create-demand-letter", label: "Create Demand Letter", icon: "M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" },
+      { id: "export-affidavit", label: "Export Affidavit", icon: "M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" },
+      { id: "export-hash-seal", label: "Export with Monad Hash Seal", icon: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" }
+    ]
+  },
+  {
+    label: "Communication",
+    items: [
+      { id: "secure-message", label: "Secure Client Message", icon: "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" }
+    ]
+  }
+];
+
+function buildContent(type: string, name: string, amount: string, leakage: string, issues: number) {
+  if (type === 'court') {
+    return `<div class="section"><h2>Executive Summary</h2><p>Forensic audit for ${name}. Significant royalty leakage detected.</p><table><tr><th>Metric</th><th>Value</th></tr><tr><td>Unclaimed</td><td class="highlight">${amount}</td></tr><tr><td>Leakage</td><td class="danger">${leakage}</td></tr><tr><td>Issues</td><td class="warning">${issues}</td></tr></table></div><div class="section"><h2>Ownership</h2><table><tr><th>Party</th><th>Claimed</th><th>Verified</th><th>Status</th></tr><tr><td>Artist</td><td>50%</td><td class="highlight">50%</td><td class="highlight">Verified</td></tr><tr><td>Producer</td><td>30%</td><td class="warning">25%</td><td class="warning">Under-claimed</td></tr><tr><td>Co-Writer</td><td>20%</td><td class="danger">15%</td><td class="danger">Disputed</td></tr></table></div><div class="section"><h2>Registration Gaps</h2><ul><li><b>ASCAP:</b> Missing publisher registration</li><li><b>BMI:</b> IPI mismatch on co-writer</li><li><b>SoundExchange:</b> No neighboring rights claim</li></ul></div>`;
+  }
+  if (type === 'demand') {
+    const d = new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+    return `<div class="section"><p><b>Date:</b> ${d}</p><p>Republic Records, Attn: Legal Department</p></div><div class="section"><p><b>RE: DEMAND FOR UNPAID ROYALTIES - ${name}</b></p><p>Amount: ${amount}</p><br><p>Dear Sir or Madam:</p><br><p>This firm demands immediate payment of ${amount} in unpaid royalties. Failure to remit within 30 days will result in legal proceedings.</p><br><p>Respectfully,<br>Leron Rogers, Esq.<br>Fox Rothschild LLP</p></div>`;
+  }
+  if (type === 'affidavit') {
+    const d = new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+    return `<div class="section"><h2>AFFIDAVIT OF LERON ROGERS, ESQ.</h2><p>STATE OF ____________)</p><br><p>I, Leron Rogers, being duly sworn, state:</p><ol><li>I am counsel for ${name}.</li><li>Forensic audit confirms ${amount} in unpaid royalties.</li><li>${issues} material discrepancies identified. Leakage rate: ${leakage}.</li><li>All findings verified via tamper-evident hash technology.</li></ol><br><p>Executed: ${d}</p><br><p>___________________________<br>Leron Rogers, Esq.</p><br><p>___________________________<br>Notary Public</p></div>`;
+  }
+  return `<div class="section"><h2>Custom Report - ${name}</h2><table><tr><th>Category</th><th>Finding</th><th>Impact</th></tr><tr><td>Streaming</td><td class="warning">Underreported Q3-Q4</td><td class="danger">-$45,200</td></tr><tr><td>Sync</td><td class="highlight">Verified</td><td>+$0</td></tr><tr><td>Performance</td><td class="danger">No ASCAP registration</td><td class="danger">${amount}</td></tr></table></div>`;
+}
+
+function generatePDF(title: string, content: string, matterName: string, matterId: number) {
+  const hash = 'TRP-' + matterId + '-' + Date.now().toString(36).toUpperCase();
+  const url = 'https://traproyaltiespro.com/verify/' + hash;
+  const sha = Array.from({length:64},()=>Math.floor(Math.random()*16).toString(16)).join('');
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title><style>body{font-family:Arial,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;color:#1a1a1a}.header{border-bottom:3px solid #4f46e5;padding-bottom:20px;margin-bottom:30px;display:flex;justify-content:space-between}.logo{font-size:1.5rem;font-weight:bold;color:#4f46e5}.section{margin:24px 0;padding:16px;background:#f9fafb;border-radius:8px;border-left:4px solid #4f46e5}table{width:100%;border-collapse:collapse;margin:16px 0}th{background:#eef2ff;padding:10px;text-align:left;color:#4f46e5}td{padding:10px;border-bottom:1px solid #e5e7eb}.qr{display:flex;align-items:center;gap:20px;padding:16px;background:#f0fdf4;border-radius:8px;border:1px solid #86efac;margin-top:24px}.footer{margin-top:40px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:.75rem;color:#9ca3af;text-align:center}.highlight{color:#16a34a;font-weight:bold}.warning{color:#d97706;font-weight:bold}.danger{color:#dc2626;font-weight:bold}h2{color:#1e1b4b}</style></head><body><div class="header"><div><div class="logo">TrapRoyalties<span style="color:#818cf8">Pro</span></div><div style="background:#eef2ff;color:#4f46e5;padding:4px 12px;border-radius:9999px;font-size:.75rem;font-weight:bold;display:inline-block;margin-top:4px">ATTORNEY PORTAL  CONFIDENTIAL</div></div><div style="text-align:right;font-size:.75rem;color:#6b7280"><div>ID: ${hash}</div><div>${new Date().toLocaleString()}</div><div style="color:#16a34a;font-weight:bold"> Verified</div></div></div><h1 style="color:#1e1b4b">${title}</h1><p style="color:#6b7280">Matter: ${matterName}  Fox Rothschild LLP  Leron Rogers, Esq.</p>${content}<div class="qr"><img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(url)}" width="100" height="100" style="border-radius:8px"/><div><div style="font-weight:bold;color:#166534"> QR Verification Seal</div><div style="font-size:.8rem;margin:4px 0">Scan to verify authenticity</div><div style="font-size:.7rem;color:#6b7280">${url}</div><div style="font-family:monospace;font-size:.7rem;background:#f3f4f6;padding:6px;border-radius:4px;margin-top:6px;word-break:break-all">SHA-256: ${sha}</div></div></div><div class="footer">TrapRoyaltiesPro.com  Confidential & Privileged  Verify: ${url}</div></body></html>`;
+  const blob = new Blob([html], {type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = title.replace(/\s+/g,'-') + '-' + hash + '.html';
+  a.click();
+}
+
+export default function AttorneyPortal() {
+  const [activeSection, setActiveSection] = useState('dashboard');
+  const [selectedMatter, setSelectedMatter] = useState(1);
+  const [scanRunning, setScanRunning] = useState(false);
+  const [scanComplete, setScanComplete] = useState(false);
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const [handshakeTrack, setHandshakeTrack] = useState('');
+  const [handshakeEmail, setHandshakeEmail] = useState('');
+  const [handshakePercentage, setHandshakePercentage] = useState('');
+  const [message, setMessage] = useState('');
+
+  const matter = MATTERS.find(m => m.id === selectedMatter) || MATTERS[0];
+
+  const runScan = () => {
+    setScanRunning(true);
+    setScanComplete(false);
+    setTimeout(() => {
+      setScanRunning(false);
+      setScanComplete(true);
+    }, 2500);
+  };
+
+  const handleDownload = (type: string, title: string) => {
+    setDownloading(type);
+    setTimeout(() => {
+      generatePDF(title, buildContent(type, matter.name, matter.amount, matter.leakage, matter.issues), matter.name, matter.id);
+      setDownloading(null);
+    }, 800);
+  };
+
+  const handleHandshakeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    alert(`Digital Handshake sent to ${handshakeEmail} for track: ${handshakeTrack} with ${handshakePercentage}% split`);
+    setHandshakeTrack('');
+    setHandshakeEmail('');
+    setHandshakePercentage('');
+  };
+
+  const handleSendMessage = () => {
+    if (message.trim()) {
+      alert(`Message sent: ${message}`);
+      setMessage('');
+    }
+  };
+
+  const showBar = !['dashboard', 'new-matter', 'secure-message', 'digital-handshake'].includes(activeSection);
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Top Bar */}
+      <div className="bg-gradient-to-r from-indigo-900 to-purple-900 text-white py-2 px-6 text-center text-sm font-medium">
+          Attorney Portal - Secure Session | Encrypted &amp; Hash-Verified
+        </div>
+
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <span className="text-2xl font-bold text-indigo-900">TrapRoyalties<span className="text-indigo-600">Pro</span></span>
+            <span className="px-3 py-1 bg-indigo-100 text-indigo-800 text-sm rounded-full font-medium">Attorney Portal</span>
+          </div>
+          <div className="flex items-center space-x-6">
+            <span className="text-sm text-gray-600">Leron Rogers (Fox Rothschild)</span>
+            <button className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition">Logout</button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Container */}
+      <div className="flex">
+        {/* Sidebar */}
+        <div className="w-72 bg-white border-r border-gray-200 min-h-screen p-6">
+          <div className="space-y-8">
+            {nav.map((group) => (
+              <div key={group.label}>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">{group.label}</p>
+                <div className="space-y-2">
+                  {group.items.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveSection(item.id)}
+                      className={`w-full flex items-center space-x-3 p-3 rounded-lg transition ${
+                        activeSection === item.id
+                          ? 'bg-indigo-50 text-indigo-900 font-medium'
+                          : 'text-gray-600 hover:bg-indigo-50'
+                      }`}
+                    >
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
+                      </svg>
+                      <span>{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Main Content Area */}
+        <div className="flex-1 p-8">
+          {showBar && (
+            <div className="mb-6 flex items-center gap-4 p-4 bg-indigo-50 rounded-lg border border-indigo-100">
+              <span className="text-sm font-medium text-indigo-900 whitespace-nowrap">Active Matter:</span>
+              <select
+                value={selectedMatter}
+                onChange={(e) => {
+                  setSelectedMatter(Number(e.target.value));
+                  setScanComplete(false);
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-black"
+              >
+                {MATTERS.map((m) => (
+                  <option key={m.id} value={m.id} className="text-black">
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-bold ${
+                  matter.status === 'Urgent'
+                    ? 'bg-red-100 text-red-800'
+                    : matter.status === 'In Progress'
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : 'bg-green-100 text-green-800'
+                }`}
+              >
+                {matter.status}
+              </span>
+            </div>
+          )}
+
+          {/* Dashboard Section */}
+          {activeSection === 'dashboard' && (
+            <div>
+              <h1 className="text-4xl font-bold text-black mb-2">Welcome back, Leron</h1>
+              <p className="text-gray-600 mb-8">Fox Rothschild LLP  Active Matters: 12</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                  <p className="text-sm text-gray-500 mb-1">Active Matters</p>
+                  <p className="text-3xl font-bold text-black">12</p>
+                  <p className="text-xs text-green-600 mt-2">+3 this month</p>
+                </div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                  <p className="text-sm text-gray-500 mb-1">Pending Audits</p>
+                  <p className="text-3xl font-bold text-black">8</p>
+                  <p className="text-xs text-yellow-600 mt-2">4 require review</p>
+                </div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                  <p className="text-sm text-gray-500 mb-1">Active Disputes</p>
+                  <p className="text-3xl font-bold text-black">3</p>
+                  <p className="text-xs text-red-600 mt-2">2 urgent</p>
+                </div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                  <p className="text-sm text-gray-500 mb-1">Black Box Value</p>
+                  <p className="text-3xl font-bold text-green-600">$1.2M</p>
+                  <p className="text-xs text-indigo-600 mt-2">Unclaimed royalties</p>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
+                <h2 className="text-2xl font-bold text-black mb-6">Recent Matters</h2>
+                <div className="space-y-4">
+                  {MATTERS.map((m) => (
+                    <div
+                      key={m.id}
+                      className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-indigo-50 transition cursor-pointer"
+                      onClick={() => {
+                        setSelectedMatter(m.id);
+                        setActiveSection('run-due-diligence');
+                      }}
+                    >
+                      <div>
+                        <p className="font-bold text-lg text-black">{m.name}</p>
+                        <p className="text-sm text-gray-500">{m.amount}  {m.issues} issues flagged</p>
+                      </div>
+                      <span
+                        className={`px-3 py-1 rounded-full text-sm font-medium ${
+                          m.status === 'Urgent'
+                            ? 'bg-red-100 text-red-800'
+                            : m.status === 'In Progress'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-green-100 text-green-800'
+                        }`}
+                      >
+                        {m.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Digital Handshake Section */}
+          {activeSection === 'digital-handshake' && (
+            <div>
+              <h1 className="text-3xl font-bold text-black mb-2">Digital Handshake</h1>
+              <p className="text-gray-600 mb-6">Create legally binding split agreements instantly</p>
+
+              <div className="grid md:grid-cols-2 gap-8">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                  <h3 className="text-xl font-bold text-black mb-6">Create New Split Agreement</h3>
+                  <form onSubmit={handleHandshakeSubmit} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Track / Project</label>
+                      <input
+                        type="text"
+                        value={handshakeTrack}
+                        onChange={(e) => setHandshakeTrack(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black bg-white"
+                        placeholder="e.g., Neon Dreams"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Producer/Writer Email</label>
+                      <input
+                        type="email"
+                        value={handshakeEmail}
+                        onChange={(e) => setHandshakeEmail(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black bg-white"
+                        placeholder="producer@email.com"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Split Percentage</label>
+                      <input
+                        type="number"
+                        value={handshakePercentage}
+                        onChange={(e) => setHandshakePercentage(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black bg-white"
+                        placeholder="50"
+                        required
+                      />
+                    </div>
+                    <button type="submit" className="w-full py-4 bg-indigo-900 text-white font-bold rounded-lg hover:bg-indigo-800 transition">
+                       Send Digital Handshake
+                    </button>
+                  </form>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                  <h3 className="text-xl font-bold text-black mb-6">Recent Invites</h3>
+                  <div className="space-y-3">
+                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="font-medium text-black">Neon Dreams</p>
+                      <p className="text-sm text-gray-500">Sent to producer@email.com  50%</p>
+                      <p className="text-xs text-green-600 mt-1"> Signed 2 hours ago</p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="font-medium text-black">Midnight Flow</p>
+                      <p className="text-sm text-gray-500">Sent to writer@email.com  25%</p>
+                      <p className="text-xs text-yellow-600 mt-1"> Pending</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Run Due Diligence Section */}
+          {activeSection === 'run-due-diligence' && (
+            <div>
+              <h1 className="text-3xl font-bold text-black mb-2">Run Catalog Due Diligence</h1>
+              <p className="text-gray-600 mb-6">Perform forensic audit for: <span className="font-bold text-indigo-900">{matter.name}</span></p>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                <div className="mb-8">
+                  <h2 className="text-lg font-semibold mb-4">Step 1: Select Client / Matter</h2>
+                  <select
+                    value={selectedMatter}
+                    onChange={(e) => setSelectedMatter(Number(e.target.value))}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-black"
+                  >
+                    {MATTERS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                </div>
+
+                <div className="mb-8">
+                  <h2 className="text-lg font-semibold mb-4">Step 2: Upload Catalog</h2>
+                  <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center">
+                    <svg className="h-12 w-12 mx-auto mb-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <p className="text-gray-600 mb-2">Drag and drop catalog files, or <span className="text-indigo-600 font-medium cursor-pointer">browse</span></p>
+                    <p className="text-sm text-gray-500">CSV, Excel, PDF up to 50MB</p>
+                  </div>
+                </div>
+
+                <div className="mb-8">
+                  <h2 className="text-lg font-semibold mb-4">Step 3: Select Audit Scope</h2>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {['Streaming Royalties', 'Sync Licensing', 'Performance Rights', '360 Deal (All Revenue)'].map((scope, i) => (
+                      <label key={scope} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-indigo-50">
+                        <input type="checkbox" className="h-4 w-4 text-indigo-600 rounded" defaultChecked={i === 3} />
+                        <span className="text-black">{scope}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {!scanRunning && !scanComplete && (
+                  <button onClick={runScan} className="w-full py-4 bg-indigo-900 text-white rounded-lg font-medium hover:bg-indigo-800 transition">
+                    Start Forensic Scan
+                  </button>
+                )}
+
+                {scanRunning && (
+                  <div className="text-center py-8">
+                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-indigo-900 border-t-transparent mb-4"></div>
+                    <p className="text-lg font-medium text-indigo-900">Running forensic scan...</p>
+                    <p className="text-sm text-gray-500 mt-2">Checking ASCAP, BMI, PRS, SOCAN</p>
+                  </div>
+                )}
+
+                {scanComplete && (
+                  <div>
+                    <div className="flex items-center gap-3 mb-6 p-4 bg-green-50 rounded-xl border border-green-200">
+                      <span className="text-2xl"></span>
+                      <div><p className="font-bold text-green-800">Scan Complete - {matter.name}</p></div>
+                    </div>
+                    
+                    <div className="grid md:grid-cols-3 gap-4 mb-6">
+                      <div className="p-4 bg-red-50 rounded-xl border border-red-200 text-center">
+                        <p className="text-3xl font-bold text-red-600">{matter.amount}</p>
+                        <p className="text-sm text-gray-600 mt-1">Unclaimed Royalties</p>
+                      </div>
+                      <div className="p-4 bg-yellow-50 rounded-xl border border-yellow-200 text-center">
+                        <p className="text-3xl font-bold text-yellow-600">{matter.leakage}</p>
+                        <p className="text-sm text-gray-600 mt-1">Leakage Rate</p>
+                      </div>
+                      <div className="p-4 bg-orange-50 rounded-xl border border-orange-200 text-center">
+                        <p className="text-3xl font-bold text-orange-600">{matter.issues}</p>
+                        <p className="text-sm text-gray-600 mt-1">Issues Flagged</p>
+                      </div>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <button onClick={() => setActiveSection('generate-court-report')} className="py-3 bg-indigo-900 text-white rounded-lg font-medium hover:bg-indigo-800 transition">
+                         Generate Court Report
+                      </button>
+                      <button onClick={() => setActiveSection('create-demand-letter')} className="py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition">
+                         Create Demand Letter
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Generate Court-Ready Report */}
+          {activeSection === 'generate-court-report' && (
+            <div>
+              <h1 className="text-3xl font-bold text-black mb-2">Generate Court-Ready Report</h1>
+              <p className="text-gray-600 mb-6">For: <span className="font-bold">{matter.name}</span></p>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 grid md:grid-cols-2 gap-8">
+                <div>
+                  <h3 className="font-semibold mb-4">Select Sections</h3>
+                  <div className="space-y-3">
+                    {['Ownership Breakdown', 'Split Inconsistencies', 'Registration Status (PROs)', 'Black Box Leakage Analysis'].map((section, i) => (
+                      <label key={section} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-indigo-50">
+                        <input type="checkbox" className="h-4 w-4 text-indigo-600 rounded" defaultChecked={i !== 2} />
+                        <span className="text-black">{section}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <button 
+                    onClick={() => handleDownload('court', 'Court-Ready Audit Report')} 
+                    disabled={downloading === 'court'} 
+                    className="w-full mt-6 py-4 bg-indigo-900 text-white rounded-lg font-medium hover:bg-indigo-800 transition disabled:opacity-50"
+                  >
+                    {downloading === 'court' ? ' Generating...' : 'Generate Report'}
+                  </button>
+                </div>
+
+                <div className="bg-gray-50 rounded-xl p-6">
+                  <h3 className="font-semibold mb-4">Report Preview</h3>
+                  <div className="text-sm space-y-3">
+                    <p className="font-medium">Confidential Audit Report</p>
+                    <p className="text-gray-500">{matter.name}</p>
+                    <p className="text-green-600 font-medium">Monad Hash Verified</p>
+                    <div className="border-t border-gray-200 pt-3">
+                      <p>Unclaimed: <span className="font-bold text-green-600">{matter.amount}</span></p>
+                      <p>Leakage: <span className="font-bold text-red-600">{matter.leakage}</span></p>
+                      <p>Issues: <span className="font-bold text-yellow-600">{matter.issues} flagged</span></p>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-center gap-2 p-3 bg-white rounded-lg border border-gray-200">
+                    <QRCode value={`https://traproyaltiespro.com/verify/TRP-COURT-${selectedMatter}`} size={60} />
+                    <p className="text-xs text-gray-500">QR verification included</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Create Demand Letter */}
+          {activeSection === 'create-demand-letter' && (
+            <div>
+              <h1 className="text-3xl font-bold text-black mb-2">Create Legal Demand Letter</h1>
+              <p className="text-gray-600 mb-6">For: <span className="font-bold">{matter.name}</span></p>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 grid md:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Recipient</label>
+                    <input type="text" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black bg-white" defaultValue="Republic Records" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                    <input type="text" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black bg-white" value={matter.amount} readOnly />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Deadline (Days)</label>
+                    <input type="number" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black bg-white" defaultValue="30" />
+                  </div>
+                  <button onClick={() => handleDownload('demand', 'Legal Demand Letter')} disabled={downloading === 'demand'} className="w-full py-4 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition disabled:opacity-50">
+                    {downloading === 'demand' ? ' Generating...' : 'Generate Demand Letter'}
+                  </button>
+                </div>
+
+                <div className="bg-gray-50 rounded-xl p-6">
+                  <h3 className="font-semibold mb-4">Letter Preview</h3>
+                  <div className="text-sm space-y-3">
+                    <p className="font-medium">RE: Unpaid Royalties - {matter.name.split(' - ')[1] || matter.name}</p>
+                    <p className="text-gray-600">Republic       <p>We demand payment of {matter.amount} in unpaid royalties, plus interest...</p>
+                    <p className="text-indigo-600 font-medium mt-4">[QR verification included]</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Pre-Release Split Verification */}
+          {activeSection === 'pre-release-verify' && (
+            <div>
+              <h1 className="text-3xl font-bold text-black mb-2">Pre-Release Split Verification</h1>
+              <p className="text-gray-600 mb-6">Verify splits before release to prevent disputes</p>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center mb-8">
+                  <svg className="h-12 w-12 mx-auto mb-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  <p className="text-gray-600 mb-2">Upload split sheet (PDF, Excel, CSV)</p>
+                  <button className="px-6 py-2 bg-indigo-100 text-indigo-900 rounded-lg font-medium hover:bg-indigo-200 transition">Choose File</button>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-8">
+                  <div>
+                    <h3 className="font-semibold mb-4">Analysis Results</h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between p-3 bg-red-50 rounded-lg">
+                        <span className="text-black">Split Total:</span>
+                        <span className="font-bold text-red-600">108% (Over-allocated)</span>
+                      </div>
+                      <div className="flex justify-between p-3 bg-yellow-50 rounded-lg">
+                        <span className="text-black">Missing Writer:</span>
+                        <span className="font-bold text-yellow-600">Producer (20%)</span>
+                      </div>
+                      <div className="flex justify-between p-3 bg-yellow-50 rounded-lg">
+                        <span className="text-black">PRO Match:</span>
+                        <span className="font-bold text-yellow-600">ASCAP incomplete</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-4">Recommendations</h3>
+                    <ul className="space-y-3">
+                      {['Adjust splits to 100%', 'Add missing IPI numbers', 'Clear feature credits pre-release'].map((rec) => (
+                        <li key={rec} className="flex items-center text-green-600">
+                          <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          {rec}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* View Audit Report */}
+          {activeSection === 'view-audit-report' && (
+            <div>
+              <h1 className="text-3xl font-bold text-black mb-2">Audit Report</h1>
+              <p className="text-gray-600 mb-6">{matter.name}</p>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                <div className="flex justify-between items-start mb-8">
+                  <div>
+                    <p className="text-sm text-gray-500">Generated: {new Date().toLocaleDateString()}</p>
+                    <p className="text-green-600 font-medium mt-2">Monad Hash Verified</p>
+                  </div>
+                  <button onClick={() => handleDownload('court', 'Audit Report')} disabled={downloading === 'court'} className="px-6 py-3 bg-indigo-900 text-white rounded-lg font-medium hover:bg-indigo-800 transition disabled:opacity-50">
+                    {downloading === 'court' ? '...' : 'Download PDF'}
+                  </button>
+                </div>
+
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="p-3 text-left text-black">Party</th>
+                      <th className="p-3 text-left text-black">Claimed</th>
+                      <th className="p-3 text-left text-black">Verified</th>
+                      <th className="p-3 text-left text-black">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    <tr>
+                      <td className="p-3 text-black">Artist (Primary)</td>
+                      <td className="p-3 text-black">50%</td>
+                      <td className="p-3 text-green-600">50%</td>
+                      <td className="p-3 text-green-600"> Verified</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-black">Producer</td>
+                      <td className="p-3 text-black">30%</td>
+                      <td className="p-3 text-yellow-600">25%</td>
+                      <td className="p-3 text-yellow-600"> Under-claimed</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 text-black">Co-Writer</td>
+                      <td className="p-3 text-black">20%</td>
+                      <td className="p-3 text-red-600">15%</td>
+                      <td className="p-3 text-red-600"> Disputed</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Generate Custom Report */}
+          {activeSection === 'generate-custom-report' && (
+            <div>
+              <h1 className="text-3xl font-bold text-black mb-2">Generate Custom Report</h1>
+              <p className="text-gray-600 mb-6">Build tailored reports for any need</p>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 grid md:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-black">
+                    <option>Full Audit Report</option>
+                    <option>Executive Summary</option>
+                    <option>Black Box Analysis</option>
+                  </select>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    {['Ownership', 'Splits', 'PRO Status', 'Black Box'].map((option, i) => (
+                      <label key={option} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-indigo-50">
+                        <input type="checkbox" className="h-4 w-4 text-indigo-600 rounded" defaultChecked={i < 2} />
+                        <span className="text-black">{option}</span>
+                      </label>
+                    ))}
+                  </div>
+
+                  <button onClick={() => handleDownload('custom', 'Custom Audit Report')} disabled={downloading === 'custom'} className="w-full py-4 bg-indigo-900 text-white rounded-lg font-medium hover:bg-indigo-800 transition disabled:opacity-50">
+                    {downloading === 'custom' ? ' Generating...' : 'Generate Report'}
+                  </button>
+                </div>
+
+                <div className="bg-gray-50 rounded-xl p-6">
+                  <p className="font-medium mb-2 text-black">Report Preview</p>
+                  <p className="text-sm text-gray-500">Custom Audit Report - {matter.name}</p>
+                  <p className="text-green-600 text-sm mt-2">Monad Verified</p>
+                  <div className="mt-4 flex items-center gap-2 p-3 bg-white rounded-lg border border-gray-200">
+                    <QRCode value={`https://traproyaltiespro.com/verify/TRP-CUSTOM-${selectedMatter}`} size={50} />
+                    <p className="text-xs text-gray-500">QR verification included</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Export Affidavit */}
+          {activeSection === 'export-affidavit' && (
+            <div>
+              <h1 className="text-3xl font-bold text-black mb-2">Export Affidavit</h1>
+              <p className="text-gray-600 mb-6">For: <span className="font-bold">{matter.name}</span></p>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-3xl">
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Matter</label>
+                  <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-black" value={selectedMatter} onChange={(e) => setSelectedMatter(Number(e.target.value))}>
+                    {MATTERS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                </div>
+
+                <div className="bg-gray-50 rounded-xl p-6 mb-6">
+                  <h3 className="font-semibold mb-4 text-black">Affidavit Preview</h3>
+                  <div className="text-sm space-y-3 text-black">
+                    <p className="font-medium">AFFIDAVIT OF LERON ROGERS, ESQ.</p>
+                    <p>1. I am counsel for {matter.name.split(' - ')[0] || matter.name}...</p>
+                    <p>2. Unpaid royalties of {matter.amount} verified via Monad hash...</p>
+                    <p className="mt-4">___________________________<br />Notary Public</p>
+                  </div>
+                </div>
+
+                <button onClick={() => handleDownload('affidavit', 'Affidavit of Counsel')} disabled={downloading === 'affidavit'} className="w-full py-4 bg-indigo-900 text-white rounded-lg font-medium hover:bg-indigo-800 transition disabled:opacity-50">
+                  {downloading === 'affidavit' ? ' Generating...' : 'Export Affidavit PDF'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Export with Monad Hash Seal */}
+          {activeSection === 'export-hash-seal' && (
+            <div>
+              <h1 className="text-3xl font-bold text-black mb-2">Export with Monad Hash Seal</h1>
+              <p className="text-gray-600 mb-6">For: <span className="font-bold">{matter.name}</span></p>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center max-w-2xl mx-auto">
+                <div className="text-6xl text-green-500 mb-4"></div>
+                <h2 className="text-2xl font-bold mb-2 text-black">Ready to Export</h2>
+                <p className="text-gray-600 mb-6">Report ID: TRP-AUDIT-{new Date().getFullYear()}-{String(selectedMatter).padStart(3, '0')}</p>
+                
+                <div className="bg-gray-50 rounded-xl p-6 mb-6">
+                  <p className="font-bold text-indigo-900 mb-2">Monad Hash Seal Verified</p>
+                  <p className="text-sm text-gray-500 break-all font-mono">0x{Array.from({length:64},()=>Math.floor(Math.random()*16).toString(16)).join('')}</p>
+                </div>
+
+                <div className="flex gap-4">
+                  <button onClick={() => handleDownload('court', 'Hash-Sealed Audit Report')} disabled={downloading === 'court'} className="flex-1 py-4 bg-indigo-900 text-white rounded-lg font-medium hover:bg-indigo-800 transition disabled:opacity-50">
+                    {downloading === 'court' ? '...' : 'Download Sealed PDF'}
+                  </button>
+                  <button className="flex-1 py-4 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition text-black">
+                    Share Secure Link
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Secure Client Message */}
+          {activeSection === 'secure-message' && (
+            <div>
+              <h1 className="text-3xl font-bold text-black mb-2">Secure Client Message</h1>
+              <p className="text-gray-600 mb-6">End-to-end encrypted chat with Metro Boomin</p>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-[600px] flex flex-col">
+                <div className="flex items-center space-x-4 mb-6 pb-4 border-b border-gray-200">
+                  <div className="w-12 h-12 bg-indigo-900 rounded-full flex items-center justify-center text-white font-bold">M</div>
+                  <div>
+                    <p className="font-bold text-black">Metro Boomin</p>
+                    <p className="text-sm text-gray-500">Online  End-to-End Encrypted</p>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-4 mb-4">
+                  <div className="flex justify-end">
+                    <div className="bg-indigo-900 text-white p-4 rounded-2xl max-w-lg">
+                      <p>Ready to send demand letter?</p>
+                    </div>
+                  </div>
+                  <div className="flex justify-start">
+                    <div className="bg-gray-100 text-black p-4 rounded-2xl max-w-lg">
+                      <p>Let's move forward. Can we add merch gap?</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <input
+                    type="text"
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                    placeholder="Type your message..."
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black bg-white"
+                  />
+                  <button
+                    onClick={handleSendMessage}
+                    className="px-6 py-3 bg-indigo-900 text-white rounded-lg font-medium hover:bg-indigo-800 transition"
+                  >
+                    Send
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* New Matter Section */}
+          {activeSection === 'new-matter' && (
+            <div>
+              <h1 className="text-3xl font-bold text-black mb-2">Create New Matter</h1>
+              <p className="text-gray-600 mb-6">Add a new client matter for royalty audit or dispute</p>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-3xl">
+                <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); setActiveSection('run-due-diligence'); }}>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Client Name</label>
+                      <input type="text" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black bg-white" placeholder="Metro Boomin" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Matter Type</label>
+                      <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-black">
+                        <option>Royalty Dispute</option>
+                        <option>Catalog Due Diligence</option>
+                        <option>360 Deal Audit</option>
+                        <option>Pre-Release Verification</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Project / Release Name</label>
+                    <input type="text" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black bg-white" placeholder="Creepin' Dispute" />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Key ISRCs / UPCs</label>
+                    <input type="text" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black bg-white" placeholder="USUM72212345, USUM72212346" />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Description / Notes</label>
+                    <textarea rows={4} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black bg-white" placeholder="Unpaid streaming royalties, label not reporting full splits..."></textarea>
+                  </div>
+
+                  <button type="submit" className="w-full py-4 bg-indigo-900 text-white rounded-lg font-medium hover:bg-indigo-800 transition">
+                    Create Matter & Start Audit
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

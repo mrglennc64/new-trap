@@ -1,0 +1,268 @@
+"use client";
+
+import Link from 'next/link';
+import { useState } from 'react';
+
+const QRCode = ({ value, size = 120 }: { value: string; size?: number }) => (
+  <img src={`https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(value)}`} alt="QR" width={size} height={size} style={{ borderRadius: '0.5rem' }} />
+);
+
+const MATTERS = [
+  { id: 1, name: "Metro Boomin – Creepin' Dispute", amount: "$187,200", status: "Urgent", leakage: "31%", issues: 5 },
+  { id: 2, name: "B.o.B Estate – 360 Deal Audit", amount: "$450,000", status: "In Progress", leakage: "22%", issues: 8 },
+  { id: 3, name: "Future – Publishing Rights", amount: "$92,500", status: "Ready", leakage: "15%", issues: 3 },
+];
+
+// Navigation structure
+const nav = [
+  {
+    label: "Matter Management",
+    items: [
+      {
+        id: "dashboard",
+        label: "Dashboard",
+        icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+      },
+      {
+        id: "new-matter",
+        label: "New Matter",
+        icon: "M12 4v16m8-8H4"
+      }
+    ]
+  },
+  {
+    label: "Audit & Due Diligence",
+    items: [
+      {
+        id: "digital-handshake",
+        label: "🤝 Digital Handshake",
+        icon: "M12 11c1.657 0 3-1.343 3-3S13.657 5 12 5 9 6.343 9 8s1.343 3 3 3zm0 2c-2.667 0-8 1.333-8 4v2h16v-2c0-2.667-5.333-4-8-4z"
+      },
+      {
+        id: "run-due-diligence",
+        label: "Run Catalog Due Diligence",
+        icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+      },
+      {
+        id: "pre-release",
+        label: "Pre-Release Split Verification",
+        icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+      }
+    ]
+  },
+  {
+    label: "Reports & Documents",
+    items: [
+      {
+        id: "view-report",
+        label: "View Audit Report",
+        icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+      },
+      {
+        id: "court-report",
+        label: "Generate Court-Ready Report",
+        icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+      },
+      {
+        id: "custom-report",
+        label: "Generate Custom Report",
+        icon: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+      }
+    ]
+  },
+  {
+    label: "Legal Actions",
+    items: [
+      {
+        id: "demand-letter",
+        label: "Create Demand Letter",
+        icon: "M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+      },
+      {
+        id: "affidavit",
+        label: "Export Affidavit",
+        icon: "M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"
+      },
+      {
+        id: "hash-seal",
+        label: "Export with Monad Hash Seal",
+        icon: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+      }
+    ]
+  },
+  {
+    label: "Communication",
+    items: [
+      {
+        id: "message",
+        label: "Secure Client Message",
+        icon: "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+      }
+    ]
+  }
+];
+
+function buildContent(type: string, name: string, amount: string, leakage: string, issues: number) {
+  if (type === 'court') return `<div class="section"><h2>Executive Summary</h2><p>Forensic audit for ${name}. Significant royalty leakage detected.</p><table><tr><th>Metric</th><th>Value</th></tr><tr><td>Unclaimed</td><td class="highlight">${amount}</td></tr><tr><td>Leakage</td><td class="danger">${leakage}</td></tr><tr><td>Issues</td><td class="warning">${issues}</td></tr></table></div><div class="section"><h2>Ownership</h2><table><tr><th>Party</th><th>Claimed</th><th>Verified</th><th>Status</th></tr><tr><td>Artist</td><td>50%</td><td class="highlight">50%</td><td class="highlight">Verified</td></tr><tr><td>Producer</td><td>30%</td><td class="warning">25%</td><td class="warning">Under-claimed</td></tr><tr><td>Co-Writer</td><td>20%</td><td class="danger">15%</td><td class="danger">Disputed</td></tr></table></div><div class="section"><h2>Registration Gaps</h2><ul><li><b>ASCAP:</b> Missing publisher registration</li><li><b>BMI:</b> IPI mismatch on co-writer</li><li><b>SoundExchange:</b> No neighboring rights claim</li></ul></div>`;
+  if (type === 'demand') { const d = new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}); return `<div class="section"><p><b>Date:</b> ${d}</p><p>Republic Records, Attn: Legal Department</p></div><div class="section"><p><b>RE: DEMAND FOR UNPAID ROYALTIES – ${name}</b></p><p>Amount: ${amount}</p><br><p>Dear Sir or Madam:</p><br><p>This firm demands immediate payment of ${amount} in unpaid royalties. Failure to remit within 30 days will result in legal proceedings.</p><br><p>Respectfully,<br>Leron Rogers, Esq.<br>Fox Rothschild LLP</p></div>`; }
+  if (type === 'affidavit') { const d = new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}); return `<div class="section"><h2>AFFIDAVIT OF LERON ROGERS, ESQ.</h2><p>STATE OF ____________)</p><br><p>I, Leron Rogers, being duly sworn, state:</p><ol><li>I am counsel for ${name}.</li><li>Forensic audit confirms ${amount} in unpaid royalties.</li><li>${issues} material discrepancies identified. Leakage rate: ${leakage}.</li><li>All findings verified via tamper-evident hash technology.</li></ol><br><p>Executed: ${d}</p><br><p>___________________________<br>Leron Rogers, Esq.</p><br><p>___________________________<br>Notary Public</p></div>`; }
+  return `<div class="section"><h2>Custom Report – ${name}</h2><table><tr><th>Category</th><th>Finding</th><th>Impact</th></tr><tr><td>Streaming</td><td class="warning">Underreported Q3-Q4</td><td class="danger">-$45,200</td></tr><tr><td>Sync</td><td class="highlight">Verified</td><td>+$0</td></tr><tr><td>Performance</td><td class="danger">No ASCAP registration</td><td class="danger">${amount}</td></tr></table></div>`;
+}
+
+function generatePDF(title: string, content: string, matterName: string, matterId: number) {
+  const hash = 'TRP-' + matterId + '-' + Date.now().toString(36).toUpperCase();
+  const url = 'https://traproyaltiespro.com/verify/' + hash;
+  const sha = Array.from({length:64},()=>Math.floor(Math.random()*16).toString(16)).join('');
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title><style>body{font-family:Arial,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;color:#1a1a1a}.header{border-bottom:3px solid #4f46e5;padding-bottom:20px;margin-bottom:30px;display:flex;justify-content:space-between}.logo{font-size:1.5rem;font-weight:bold;color:#4f46e5}.section{margin:24px 0;padding:16px;background:#f9fafb;border-radius:8px;border-left:4px solid #4f46e5}table{width:100%;border-collapse:collapse;margin:16px 0}th{background:#eef2ff;padding:10px;text-align:left;color:#4f46e5}td{padding:10px;border-bottom:1px solid #e5e7eb}.qr{display:flex;align-items:center;gap:20px;padding:16px;background:#f0fdf4;border-radius:8px;border:1px solid #86efac;margin-top:24px}.footer{margin-top:40px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:.75rem;color:#9ca3af;text-align:center}.highlight{color:#16a34a;font-weight:bold}.warning{color:#d97706;font-weight:bold}.danger{color:#dc2626;font-weight:bold}h2{color:#1e1b4b}</style></head><body><div class="header"><div><div class="logo">TrapRoyalties<span style="color:#818cf8">Pro</span></div><div style="background:#eef2ff;color:#4f46e5;padding:4px 12px;border-radius:9999px;font-size:.75rem;font-weight:bold;display:inline-block;margin-top:4px">ATTORNEY PORTAL · CONFIDENTIAL</div></div><div style="text-align:right;font-size:.75rem;color:#6b7280"><div>ID: ${hash}</div><div>${new Date().toLocaleString()}</div><div style="color:#16a34a;font-weight:bold">✓ Verified</div></div></div><h1 style="color:#1e1b4b">${title}</h1><p style="color:#6b7280">Matter: ${matterName} · Fox Rothschild LLP · Leron Rogers, Esq.</p>${content}<div class="qr"><img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(url)}" width="100" height="100" style="border-radius:8px"/><div><div style="font-weight:bold;color:#166534">✓ QR Verification Seal</div><div style="font-size:.8rem;margin:4px 0">Scan to verify authenticity</div><div style="font-size:.7rem;color:#6b7280">${url}</div><div style="font-family:monospace;font-size:.7rem;background:#f3f4f6;padding:6px;border-radius:4px;margin-top:6px;word-break:break-all">SHA-256: ${sha}</div></div></div><div class="footer">TrapRoyaltiesPro.com · Confidential & Privileged · Verify: ${url}</div></body></html>`;
+  const blob = new Blob([html], {type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = title.replace(/\s+/g,'-') + '-' + hash + '.html';
+  a.click();
+}
+
+export default function AttorneyPortal() {
+  const [activeSection, setActiveSection] = useState('dashboard');
+  const [selectedMatter, setSelectedMatter] = useState(1);
+  const [scanRunning, setScanRunning] = useState(false);
+  const [scanComplete, setScanComplete] = useState(false);
+  const [downloading, setDownloading] = useState<string|null>(null);
+
+  const matter = MATTERS.find(m => m.id === selectedMatter) || MATTERS[0];
+
+  const runScan = () => { setScanRunning(true); setScanComplete(false); setTimeout(() => { setScanRunning(false); setScanComplete(true); }, 2500); };
+
+  const handleDownload = (type: string, title: string) => {
+    setDownloading(type);
+    setTimeout(() => { generatePDF(title, buildContent(type, matter.name, matter.amount, matter.leakage, matter.issues), matter.name, matter.id); setDownloading(null); }, 800);
+  };
+
+  const showBar = !['dashboard', 'new-matter', 'message', 'digital-handshake'].includes(activeSection);
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-gradient-to-r from-indigo-900 to-purple-900 text-white py-2 px-6 text-center text-sm font-medium">
+        Attorney Portal – Secure Session | Encrypted & Hash-Verified
+      </div>
+      
+      <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Link href="/" className="text-2xl font-bold text-indigo-900">TrapRoyalties<span className="text-indigo-600">Pro</span></Link>
+            <span className="px-3 py-1 bg-indigo-100 text-indigo-800 text-sm rounded-full font-medium">Attorney Portal</span>
+          </div>
+          <div className="flex items-center space-x-6">
+            <span className="text-sm text-gray-600">Leron Rogers (Fox Rothschild)</span>
+            <Link href="/" className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition">Logout</Link>
+          </div>
+        </div>
+      </header>
+
+      <div className="flex">
+        {/* Sidebar */}
+        <div className="w-72 bg-white border-r border-gray-200 min-h-screen p-6">
+          <div className="space-y-8">
+            {nav.map(group => (
+              <div key={group.label}>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">{group.label}</p>
+                <div className="space-y-2">
+                  {group.items.map(item => (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveSection(item.id)}
+                      className={`w-full flex items-center space-x-3 p-3 rounded-lg transition ${
+                        activeSection === item.id
+                          ? 'bg-indigo-50 text-indigo-900 font-medium'
+                          : 'text-gray-600 hover:bg-indigo-50'
+                      }`}
+                    >
+                      <svg className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
+                      </svg>
+                      <span className="text-left text-sm flex-1">{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 p-8">
+          {showBar && (
+            <div className="mb-6 flex items-center gap-4 p-4 bg-indigo-50 rounded-xl border border-indigo-100">
+              <span className="text-sm font-medium text-indigo-900 whitespace-nowrap">Active Matter:</span>
+              <select
+                value={selectedMatter}
+                onChange={(e) => {
+                  setSelectedMatter(Number(e.target.value));
+                  setScanComplete(false);
+                }}
+                className="flex-1 px-4 py-2 border border-indigo-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+              >
+                {MATTERS.map(m => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+              <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                matter.status === 'Urgent' ? 'bg-red-100 text-red-800' :
+                matter.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' :
+                'bg-green-100 text-green-800'
+              }`}>
+                {matter.status}
+              </span>
+            </div>
+          )}
+
+          {/* Digital Handshake Section */}
+          {activeSection === 'digital-handshake' && (
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Digital Handshake</h1>
+              <p className="text-gray-600 mb-8">Create legally binding split agreements</p>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                <div className="grid md:grid-cols-2 gap-8">
+                  <div>
+                    <h3 className="font-semibold mb-4">Create New Split Agreement</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Track / Project</label>
+                        <input type="text" className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="e.g., Neon Dreams" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Producer/Writer Email</label>
+                        <input type="email" className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="producer@email.com" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Split Percentage</label>
+                        <input type="number" className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="50" />
+                      </div>
+                      <button className="w-full py-4 bg-indigo-900 text-white rounded-lg font-medium hover:bg-indigo-800 transition">
+                        🤝 Send Digital Handshake
+                      </button>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-6">
+                    <h3 className="font-semibold mb-4">Recent Invites</h3>
+                    <div className="space-y-3">
+                      <div className="p-3 bg-white rounded-lg border border-gray-200">
+                        <p className="font-medium">Neon Dreams</p>
+                        <p className="text-sm text-gray-500">Sent to producer@email.com · 50%</p>
+                        <p className="text-xs text-green-600 mt-1">✓ Signed 2 hours ago</p>
+                      </div>
+                      <div className="p-3 bg-white rounded-lg border border-gray-200">
+                        <p className="font-medium">Midnight Flow</p>
+                        <p className="text-sm text-gray-500">Sent to writer@email.com · 25%</p>
+                        <p className="text-xs text-yellow-600 mt-1">⏳ Pending</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

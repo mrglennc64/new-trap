@@ -1,0 +1,657 @@
+INFO:     Will watch for changes in these directories: ['/root/traproyalties-new']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [62570] using StatReload
+INFO:     Started server process [62572]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Will watch for changes in these directories: ['/root/traproyalties-new']
+ERROR:    [Errno 98] Address already in use
+INFO:     127.0.0.1:38554 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36454 - "POST /catalog/royalty-finder HTTP/1.1" 200 OK
+INFO:     149.224.32.82:0 - "GET /robots.txt HTTP/1.0" 404 Not Found
+INFO:     149.224.32.82:0 - "GET / HTTP/1.0" 200 OK
+INFO:     94.234.94.212:0 - "GET /catalog/royalty-finder HTTP/1.0" 405 Method Not Allowed
+INFO:     94.234.94.212:0 - "GET /catalog/royalty-finder HTTP/1.0" 405 Method Not Allowed
+INFO:     94.234.94.212:0 - "GET /catalog/audit HTTP/1.0" 404 Not Found
+INFO:     94.234.94.212:0 - "GET /catalog/audit HTTP/1.0" 404 Not Found
+INFO:     94.234.94.212:0 - "GET /catalog/royalty-finder HTTP/1.0" 405 Method Not Allowed
+INFO:     94.234.94.212:0 - "GET /catalog/royalty-finder HTTP/1.0" 405 Method Not Allowed
+INFO:     94.234.94.212:0 - "GET /catalog/royalty-finder HTTP/1.0" 405 Method Not Allowed
+INFO:     94.234.94.212:0 - "GET /catalog/audit HTTP/1.0" 404 Not Found
+INFO:     94.234.94.212:0 - "GET /catalog/audit HTTP/1.0" 404 Not Found
+INFO:     94.234.94.212:0 - "GET /catalog/audit HTTP/1.0" 404 Not Found
+INFO:     94.234.94.212:0 - "GET /catalog/audit HTTP/1.0" 404 Not Found
+INFO:     94.234.94.212:0 - "GET /catalog/audit HTTP/1.0" 404 Not Found
+INFO:     157.143.20.242:0 - "GET / HTTP/1.0" 200 OK
+INFO:     157.143.20.242:0 - "GET /js/lkk_ch.js HTTP/1.0" 404 Not Found
+INFO:     157.143.20.242:0 - "GET /js/twint_ch.js HTTP/1.0" 404 Not Found
+INFO:     157.143.20.242:0 - "GET /css/support_parent.css HTTP/1.0" 404 Not Found
+INFO:     95.177.163.4:0 - "GET / HTTP/1.0" 200 OK
+INFO:     101.33.243.210:0 - "POST / HTTP/1.0" 405 Method Not Allowed
+INFO:     101.33.243.210:0 - "POST /index.php HTTP/1.0" 404 Not Found
+INFO:     101.33.243.210:0 - "POST /admin HTTP/1.0" 404 Not Found
+INFO:     101.33.243.210:0 - "POST /api HTTP/1.0" 404 Not Found
+INFO:     84.37.240.107:0 - "GET / HTTP/1.0" 200 OK
+INFO:     84.37.240.107:0 - "GET /favicon.ico HTTP/1.0" 404 Not Found
+INFO:     130.180.239.178:0 - "GET / HTTP/1.0" 200 OK
+INFO:     43.142.1.254:0 - "GET / HTTP/1.0" 200 OK
+INFO:     172.239.121.31:0 - "GET / HTTP/1.0" 200 OK
+INFO:     157.143.20.242:0 - "GET / HTTP/1.0" 200 OK
+INFO:     157.143.20.242:0 - "GET /js/twint_ch.js HTTP/1.0" 404 Not Found
+INFO:     157.143.20.242:0 - "GET /css/support_parent.css HTTP/1.0" 404 Not Found
+INFO:     157.143.20.242:0 - "GET /js/lkk_ch.js HTTP/1.0" 404 Not Found
+INFO:     184.72.129.61:0 - "GET /.git/config HTTP/1.0" 404 Not Found
+INFO:     173.212.219.125:0 - "POST / HTTP/1.0" 405 Method Not Allowed
+INFO:     173.212.219.125:0 - "POST /index.php HTTP/1.0" 404 Not Found
+INFO:     173.212.219.125:0 - "POST /admin HTTP/1.0" 404 Not Found
+INFO:     173.212.219.125:0 - "POST /api HTTP/1.0" 404 Not Found
+INFO:     141.51.110.126:0 - "GET / HTTP/1.0" 200 OK
+INFO:     141.51.110.126:0 - "GET / HTTP/1.0" 200 OK
+INFO:     147.185.133.41:0 - "GET / HTTP/1.0" 200 OK
+INFO:     18.237.107.80:0 - "GET / HTTP/1.0" 200 OK
+INFO:     18.237.107.80:0 - "GET / HTTP/1.0" 200 OK
+INFO:     74.7.175.149:0 - "GET /robots.txt HTTP/1.0" 404 Not Found
+INFO:     74.7.244.18:0 - "GET /robots.txt HTTP/1.0" 404 Not Found
+INFO:     94.234.94.212:0 - "GET /catalog/audit HTTP/1.0" 404 Not Found
+INFO:     187.77.93.145:0 - "GET /catalog/audit HTTP/1.0" 404 Not Found
+INFO:     45.154.98.41:0 - "GET //.env HTTP/1.0" 404 Not Found
+INFO:     136.117.122.251:0 - "GET / HTTP/1.0" 200 OK
+INFO:     151.115.99.185:0 - "HEAD / HTTP/1.0" 405 Method Not Allowed
+INFO:     151.115.99.185:0 - "GET / HTTP/1.0" 200 OK
+INFO:     151.115.99.185:0 - "GET /favicon.ico HTTP/1.0" 404 Not Found
+INFO:     151.115.99.185:0 - "GET /favicon.ico HTTP/1.0" 404 Not Found
+INFO:     151.115.99.185:0 - "GET /favicon.ico/ads.txt HTTP/1.0" 404 Not Found
+INFO:     151.115.99.185:0 - "GET /favicon.ico/app-ads.txt HTTP/1.0" 404 Not Found
+INFO:     151.115.99.185:0 - "GET /favicon.ico/sellers.json HTTP/1.0" 404 Not Found
+INFO:     127.0.0.1:51156 - "GET /catalog/audit HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51618 - "GET /catalog/audit HTTP/1.1" 404 Not Found
+INFO:     Will watch for changes in these directories: ['/root/traproyalties-new']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [648241] using StatReload
+INFO:     Started server process [648244]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+ERROR:    Traceback (most recent call last):
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/_compat.py", line 30, in asyncio_run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 79, in serve
+    await self._serve(sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 94, in _serve
+    await self.startup(sockets=sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 144, in startup
+    server = await loop.create_server(create_protocol, sock=sock, ssl=config.ssl, backlog=config.backlog)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 1561, in create_server
+    server._start_serving()
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 316, in _start_serving
+    sock.listen(self._backlog)
+OSError: [Errno 98] Address already in use
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/starlette/routing.py", line 686, in lifespan
+    await receive()
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/lifespan/on.py", line 137, in receive
+    return await self.receive_queue.get()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/queues.py", line 158, in get
+    await getter
+asyncio.exceptions.CancelledError
+
+Process SpawnProcess-1:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/usr/local/lib/python3.11/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 75, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/_compat.py", line 30, in asyncio_run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 79, in serve
+    await self._serve(sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 94, in _serve
+    await self.startup(sockets=sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 144, in startup
+    server = await loop.create_server(create_protocol, sock=sock, ssl=config.ssl, backlog=config.backlog)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 1561, in create_server
+    server._start_serving()
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 316, in _start_serving
+    sock.listen(self._backlog)
+OSError: [Errno 98] Address already in use
+WARNING:  StatReload detected changes in 'api/services/musicbrainz.py'. Reloading...
+INFO:     Started server process [648792]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+ERROR:    Traceback (most recent call last):
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/_compat.py", line 30, in asyncio_run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 79, in serve
+    await self._serve(sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 94, in _serve
+    await self.startup(sockets=sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 144, in startup
+    server = await loop.create_server(create_protocol, sock=sock, ssl=config.ssl, backlog=config.backlog)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 1561, in create_server
+    server._start_serving()
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 316, in _start_serving
+    sock.listen(self._backlog)
+OSError: [Errno 98] Address already in use
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/starlette/routing.py", line 686, in lifespan
+    await receive()
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/lifespan/on.py", line 137, in receive
+    return await self.receive_queue.get()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/queues.py", line 158, in get
+    await getter
+asyncio.exceptions.CancelledError
+
+Process SpawnProcess-2:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/usr/local/lib/python3.11/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 75, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/_compat.py", line 30, in asyncio_run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 79, in serve
+    await self._serve(sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 94, in _serve
+    await self.startup(sockets=sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 144, in startup
+    server = await loop.create_server(create_protocol, sock=sock, ssl=config.ssl, backlog=config.backlog)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 1561, in create_server
+    server._start_serving()
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 316, in _start_serving
+    sock.listen(self._backlog)
+OSError: [Errno 98] Address already in use
+INFO:     Will watch for changes in these directories: ['/root/traproyalties-new']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [648797] using StatReload
+INFO:     Stopping reloader process [648241]
+INFO:     Started server process [648800]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:38620 - "POST /catalog/royalty-finder HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'api/services/ascap_stub.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [648800]
+INFO:     Started server process [648835]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'api/services/bmi_stub.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [648835]
+INFO:     Started server process [648847]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [648847]
+INFO:     Stopping reloader process [648797]
+INFO:     Will watch for changes in these directories: ['/root/traproyalties-new']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [648851] using StatReload
+INFO:     Started server process [648853]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+ASCAP status: 404
+BMI error: Expecting value: line 1 column 1 (char 0)
+INFO:     127.0.0.1:48954 - "POST /catalog/royalty-finder HTTP/1.1" 200 OK
+INFO:     Will watch for changes in these directories: ['/root/traproyalties-new']
+ERROR:    [Errno 98] Address already in use
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [648853]
+INFO:     Stopping reloader process [648851]
+INFO:     Will watch for changes in these directories: ['/root/traproyalties-new']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [649224] using StatReload
+INFO:     Started server process [649228]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+MusicBrainz error: 
+Discogs error: Server error '502 Bad Gateway' for url 'https://api.discogs.com/database/search?artist=future&track=future&type=release&per_page=5'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/502
+ASCAP status: 404
+BMI error: Expecting value: line 1 column 1 (char 0)
+INFO:     94.234.94.212:0 - "POST /catalog/royalty-finder HTTP/1.0" 200 OK
+WARNING:  StatReload detected changes in 'api/routes/royalty_finder.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [649228]
+Process SpawnProcess-2:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/usr/local/lib/python3.11/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 75, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/_compat.py", line 30, in asyncio_run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 79, in serve
+    await self._serve(sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 86, in _serve
+    config.load()
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/config.py", line 441, in load
+    self.loaded_app = import_from_string(self.app)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/importlib/__init__.py", line 126, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+  File "/root/traproyalties-new/api/main.py", line 5, in <module>
+    from api.routes.royalty_finder import router as royalty_finder_router
+  File "/root/traproyalties-new/api/routes/royalty_finder.py", line 81
+    Hunt down unclaimed bags from streams, syncs, performances & playlists. Scan major PROs (ASCAP, BMI, SOCAN, PRS) for gaps — especially in hip hop collabs, features, & R&B hooks.
+                                                                                                                              ^
+SyntaxError: invalid character '—' (U+2014)
+INFO:     Will watch for changes in these directories: ['/root/traproyalties-new']
+ERROR:    [Errno 98] Address already in use
+INFO:     Stopping reloader process [649224]
+INFO:     Will watch for changes in these directories: ['/root/traproyalties-new']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [649654] using StatReload
+Process SpawnProcess-1:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/usr/local/lib/python3.11/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 75, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/_compat.py", line 30, in asyncio_run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 79, in serve
+    await self._serve(sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 86, in _serve
+    config.load()
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/config.py", line 441, in load
+    self.loaded_app = import_from_string(self.app)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/importlib/__init__.py", line 126, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+  File "/root/traproyalties-new/api/main.py", line 5, in <module>
+    from api.routes.royalty_finder import router as royalty_finder_router
+  File "/root/traproyalties-new/api/routes/royalty_finder.py", line 81
+    Hunt down unclaimed bags from streams, syncs, performances & playlists. Scan major PROs (ASCAP, BMI, SOCAN, PRS) for gaps — especially in hip hop collabs, features, & R&B hooks.
+                                                                                                                              ^
+SyntaxError: invalid character '—' (U+2014)
+INFO:     Will watch for changes in these directories: ['/root/traproyalties-new']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [650027] using StatReload
+Process SpawnProcess-1:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/usr/local/lib/python3.11/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 75, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/_compat.py", line 30, in asyncio_run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 79, in serve
+    await self._serve(sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 86, in _serve
+    config.load()
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/config.py", line 441, in load
+    self.loaded_app = import_from_string(self.app)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/importlib/__init__.py", line 126, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+  File "/root/traproyalties-new/api/main.py", line 5, in <module>
+    from api.routes.royalty_finder import router as royalty_finder_router
+  File "/root/traproyalties-new/api/routes/royalty_finder.py", line 81
+    Hunt down unclaimed bags from streams, syncs, performances & playlists. Scan major PROs (ASCAP, BMI, SOCAN, PRS) for gaps — especially in hip hop collabs, features, & R&B hooks.
+                                                                                                                              ^
+SyntaxError: invalid character '—' (U+2014)
+WARNING:  StatReload detected changes in 'api/routes/royalty_finder.py'. Reloading...
+INFO:     Started server process [650095]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'api/routes/royalty_finder.py'. Reloading...
+INFO:     Started server process [650097]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+ERROR:    Traceback (most recent call last):
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/_compat.py", line 30, in asyncio_run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 79, in serve
+    await self._serve(sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 94, in _serve
+    await self.startup(sockets=sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 144, in startup
+    server = await loop.create_server(create_protocol, sock=sock, ssl=config.ssl, backlog=config.backlog)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 1561, in create_server
+    server._start_serving()
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 316, in _start_serving
+    sock.listen(self._backlog)
+OSError: [Errno 98] Address already in use
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/starlette/routing.py", line 686, in lifespan
+    await receive()
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/lifespan/on.py", line 137, in receive
+    return await self.receive_queue.get()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/queues.py", line 158, in get
+    await getter
+asyncio.exceptions.CancelledError
+
+Process SpawnProcess-2:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/usr/local/lib/python3.11/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 75, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/_compat.py", line 30, in asyncio_run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 79, in serve
+    await self._serve(sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 94, in _serve
+    await self.startup(sockets=sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 144, in startup
+    server = await loop.create_server(create_protocol, sock=sock, ssl=config.ssl, backlog=config.backlog)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 1561, in create_server
+    server._start_serving()
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 316, in _start_serving
+    sock.listen(self._backlog)
+OSError: [Errno 98] Address already in use
+INFO:     Will watch for changes in these directories: ['/root/traproyalties-new']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [650103] using StatReload
+INFO:     Started server process [650106]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+ERROR:    Traceback (most recent call last):
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/_compat.py", line 30, in asyncio_run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 79, in serve
+    await self._serve(sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 94, in _serve
+    await self.startup(sockets=sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 144, in startup
+    server = await loop.create_server(create_protocol, sock=sock, ssl=config.ssl, backlog=config.backlog)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 1561, in create_server
+    server._start_serving()
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 316, in _start_serving
+    sock.listen(self._backlog)
+OSError: [Errno 98] Address already in use
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/starlette/routing.py", line 686, in lifespan
+    await receive()
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/lifespan/on.py", line 137, in receive
+    return await self.receive_queue.get()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/queues.py", line 158, in get
+    await getter
+asyncio.exceptions.CancelledError
+
+Process SpawnProcess-1:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/usr/local/lib/python3.11/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 75, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/_compat.py", line 30, in asyncio_run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 79, in serve
+    await self._serve(sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 94, in _serve
+    await self.startup(sockets=sockets)
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/server.py", line 144, in startup
+    server = await loop.create_server(create_protocol, sock=sock, ssl=config.ssl, backlog=config.backlog)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 1561, in create_server
+    server._start_serving()
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 316, in _start_serving
+    sock.listen(self._backlog)
+OSError: [Errno 98] Address already in use
+INFO:     Will watch for changes in these directories: ['/root/traproyalties-new']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [650111] using StatReload
+INFO:     Started server process [650116]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Will watch for changes in these directories: ['/root/traproyalties-new']
+ERROR:    [Errno 98] Address already in use
+Traceback (most recent call last):
+  File "/root/traproyalties-new/venv/bin/uvicorn", line 8, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/click/core.py", line 1485, in __call__
+    return self.main(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/click/core.py", line 1406, in main
+    rv = self.invoke(ctx)
+         ^^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/click/core.py", line 1269, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/click/core.py", line 824, in invoke
+    return callback(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/main.py", line 433, in main
+    run(
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/main.py", line 601, in run
+    ChangeReload(config, target=server.run, sockets=[sock]).run()
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/supervisors/basereload.py", line 52, in run
+    for changes in self:
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/supervisors/basereload.py", line 71, in __next__
+    return self.should_restart()
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/supervisors/statreload.py", line 31, in should_restart
+    for file in self.iter_py_files():
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/supervisors/statreload.py", line 51, in iter_py_files
+    for path in list(reload_dir.rglob("*.py")):
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/pathlib.py", line 968, in rglob
+    for p in selector.select_from(self):
+  File "/usr/local/lib/python3.11/pathlib.py", line 408, in _select_from
+    for p in successor_select(starting_point, is_dir, exists, scandir):
+  File "/usr/local/lib/python3.11/pathlib.py", line 355, in _select_from
+    with scandir(parent_path) as scandir_it:
+         ^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/pathlib.py", line 938, in _scandir
+    return os.scandir(self)
+           ^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/root/traproyalties-new/packages/frontend/.next/server/app/test-simple'
+Traceback (most recent call last):
+  File "/root/traproyalties-new/venv/bin/uvicorn", line 8, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/click/core.py", line 1485, in __call__
+    return self.main(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/click/core.py", line 1406, in main
+    rv = self.invoke(ctx)
+         ^^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/click/core.py", line 1269, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/click/core.py", line 824, in invoke
+    return callback(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/main.py", line 433, in main
+    run(
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/main.py", line 601, in run
+    ChangeReload(config, target=server.run, sockets=[sock]).run()
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/supervisors/basereload.py", line 52, in run
+    for changes in self:
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/supervisors/basereload.py", line 71, in __next__
+    return self.should_restart()
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/supervisors/statreload.py", line 31, in should_restart
+    for file in self.iter_py_files():
+  File "/root/traproyalties-new/venv/lib/python3.11/site-packages/uvicorn/supervisors/statreload.py", line 51, in iter_py_files
+    for path in list(reload_dir.rglob("*.py")):
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/pathlib.py", line 968, in rglob
+    for p in selector.select_from(self):
+  File "/usr/local/lib/python3.11/pathlib.py", line 408, in _select_from
+    for p in successor_select(starting_point, is_dir, exists, scandir):
+  File "/usr/local/lib/python3.11/pathlib.py", line 355, in _select_from
+    with scandir(parent_path) as scandir_it:
+         ^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/pathlib.py", line 938, in _scandir
+    return os.scandir(self)
+           ^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/root/traproyalties-new/packages/frontend/node_modules/.autoprefixer-3JxIQvnz'
+INFO:     Will watch for changes in these directories: ['/root/traproyalties-new']
+ERROR:    [Errno 98] Address already in use

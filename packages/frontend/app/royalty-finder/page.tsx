@@ -1,429 +1,282 @@
 "use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import Header from '../components/Header';
-import Footer from '../components/Footer';
-
-interface SearchResult {
-  id: string;
-  name: string;
-  role: string;
-  matchCount: number;
-  confidence: 'high' | 'medium' | 'low';
-}
-
-interface TrackResult {
-  id: string;
-  title: string;
-  artist: string;
-  isrc?: string;
-  estimatedAmount: number;
-  confidence: 'high' | 'medium' | 'low';
-  source: string;
-  platform?: string;
-}
+import { useState } from "react";
+import Link from "next/link";
 
 export default function RoyaltyFinderPage() {
-  const [searchType, setSearchType] = useState<'artist' | 'writer'>('artist');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searching, setSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null);
-  const [trackResults, setTrackResults] = useState<TrackResult[]>([]);
-  const [showEmailModal, setShowEmailModal] = useState(false);
-  const [email, setEmail] = useState('');
-  const [emailSent, setEmailSent] = useState(false);
+  const [searchType, setSearchType] = useState<"artist" | "writer">("artist");
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState<any | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
-    
-    setSearching(true);
-    setSearchResults([]);
-    
-    // Simulate API call
-    setTimeout(() => {
-      // Mock results based on search query
-      const mockResults: SearchResult[] = [];
-      
-      if (searchQuery.toLowerCase().includes('metro') || searchQuery.toLowerCase().includes('boomin')) {
-        mockResults.push({
-          id: 'metro-1',
-          name: 'Metro Boomin',
-          role: 'Producer',
-          matchCount: 847,
-          confidence: 'high'
-        });
-      }
-      
-      if (searchQuery.toLowerCase().includes('future')) {
-        mockResults.push({
-          id: 'future-1',
-          name: 'Future',
-          role: 'Artist',
-          matchCount: 1234,
-          confidence: 'high'
-        });
-      }
-      
-      if (searchQuery.toLowerCase().includes('sza')) {
-        mockResults.push({
-          id: 'sza-1',
-          name: 'SZA',
-          role: 'Artist',
-          matchCount: 892,
-          confidence: 'high'
-        });
-      }
-      
-      if (searchQuery.toLowerCase().includes('weeknd')) {
-        mockResults.push({
-          id: 'weeknd-1',
-          name: 'The Weeknd',
-          role: 'Artist',
-          matchCount: 2103,
-          confidence: 'high'
-        });
-      }
-      
-      // If no specific matches, show generic
-      if (mockResults.length === 0) {
-        mockResults.push({
-          id: 'generic-1',
-          name: searchQuery,
-          role: searchType === 'artist' ? 'Artist' : 'Writer',
-          matchCount: 0,
-          confidence: 'low'
-        });
-      }
-      
-      setSearchResults(mockResults);
-      setSearching(false);
-    }, 1500);
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+    setLoading(true);
+    setError(null);
+    setResults(null);
+    try {
+      const res = await fetch("/api/catalog/royalty-finder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: query,
+          artist: query,
+          searchType,
+        }),
+      });
+      if (!res.ok) throw new Error(`Search failed: ${res.status}`);
+      const data = await res.json();
+      setResults(data);
+    } catch (err: any) {
+      setError(err.message);
+    }
+    setLoading(false);
   };
 
-  const handleSelectResult = (result: SearchResult) => {
-    setSelectedResult(result);
-    setSearching(true);
-    
-    // Simulate fetching track results
-    setTimeout(() => {
-      const mockTracks: TrackResult[] = [
-        {
-          id: 'track-1',
-          title: 'DRIP TOO HARD',
-          artist: result.name,
-          isrc: 'US-XYZ-25-00123',
-          estimatedAmount: 3450,
-          confidence: 'high',
-          source: 'ASCAP',
-          platform: 'Streaming'
-        },
-        {
-          id: 'track-2',
-          title: 'STREET RUNNER',
-          artist: result.name,
-          isrc: 'US-XYZ-25-00124',
-          estimatedAmount: 2800,
-          confidence: 'medium',
-          source: 'BMI',
-          platform: 'Sync Licensing'
-        },
-        {
-          id: 'track-3',
-          title: 'LATE NIGHT VIBES',
-          artist: result.name,
-          isrc: 'US-XYZ-25-00125',
-          estimatedAmount: 4200,
-          confidence: 'high',
-          source: 'SOCAN',
-          platform: 'Performance Royalties'
-        },
-        {
-          id: 'track-4',
-          title: 'MIDNIGHT DRIVE',
-          artist: result.name,
-          estimatedAmount: 1900,
-          confidence: 'low',
-          source: 'PRS',
-          platform: 'Mechanical'
-        }
-      ];
-      
-      setTrackResults(mockTracks);
-      setSearching(false);
-      setShowEmailModal(true);
-    }, 2000);
+  const missingIcons: Record<string, string> = {
+    ascap: "🎵",
+    bmi: "🎼",
+    soundexchange: "💿",
+    default: "⚠️",
   };
 
-  const handleEmailSubmit = async () => {
-    if (!email.includes('@')) return;
-    
-    setEmailSent(true);
-    setTimeout(() => {
-      setShowEmailModal(false);
-      setEmailSent(false);
-      setEmail('');
-    }, 2000);
+  const missingColors: Record<string, string> = {
+    ascap: "#f59e0b",
+    bmi: "#3b82f6",
+    soundexchange: "#10b981",
+    default: "#f87171",
   };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const totalEstimated = trackResults.reduce((sum, track) => sum + track.estimatedAmount, 0);
 
   return (
-    <div className="min-h-screen gradient-bg">
-      <Header />
-      
-      <main className="pt-28 pb-20 px-6 max-w-5xl mx-auto">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-6xl font-bold neon-cyan mb-4">Find Missing Royalties</h1>
-          <p className="text-xl md:text-2xl text-gray-300 max-w-4xl mx-auto">
-            Hunt down unclaimed bags from streams, syncs, performances & playlists. Scan major PROs (ASCAP, BMI, SOCAN, PRS) for gaps — especially in hip hop collabs, features, & R&B hooks.
-          </p>
-          <p className="mt-4 text-lg text-purple-300 font-medium">Free basic search • Real-time estimates • Upgrade for full recovery & on-chain proof</p>
-        </div>
+    <div style={{ background: "linear-gradient(135deg, #1e0033, #000033, #000)", color: "#e0e0e0", fontFamily: "'Inter', sans-serif", minHeight: "100vh" }}>
 
-        <div className="bg-gray-900/60 backdrop-blur-md rounded-3xl shadow-2xl border border-purple-900/50 p-8 md:p-12">
-          {/* Search Type Toggle */}
-          <div className="flex space-x-4 mb-10">
-            <button 
-              onClick={() => setSearchType('artist')}
-              className={`flex-1 py-5 rounded-2xl font-semibold flex items-center justify-center space-x-3 transition-all ${
-                searchType === 'artist' 
-                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-900/40 transform hover:scale-105' 
-                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-              }`}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
-              </svg>
-              <span>Search by Artist / Group</span>
-            </button>
-            <button 
-              onClick={() => setSearchType('writer')}
-              className={`flex-1 py-5 rounded-2xl font-semibold flex items-center justify-center space-x-3 transition-all ${
-                searchType === 'writer' 
-                  ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-900/40 transform hover:scale-105' 
-                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-              }`}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-              </svg>
-              <span>Search by Writer / Producer</span>
-            </button>
+      {/* Navbar */}
+      <nav style={{ position: "fixed", width: "100%", zIndex: 50, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(168,85,247,0.3)" }}>
+        <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "1rem 1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <Link href="/" style={{ textDecoration: "none" }}>
+            <span style={{ fontSize: "1.5rem", fontWeight: 700, fontFamily: "'Orbitron', sans-serif", textShadow: "0 0 10px #a855f7, 0 0 20px #a855f7", color: "#fff" }}>
+              TrapRoyalties Pro
+            </span>
+          </Link>
+          <div style={{ display: "flex", gap: "2rem", alignItems: "center" }}>
+            <Link href="/" style={{ color: "#d1d5db", textDecoration: "none" }}>Home</Link>
+            <Link href="/free-audit" style={{ color: "#d1d5db", textDecoration: "none" }}>Free Audit</Link>
+            <Link href="/royalty-finder" style={{ color: "#a855f7", fontWeight: 500, textDecoration: "none" }}>Find Missing Royalties</Link>
+            <Link href="/for-attorneys" style={{ color: "#fbbf24", textDecoration: "none" }}>⚖️ Attorneys</Link>
           </div>
-
-          {/* Search Form */}
-          <div className="relative mb-8">
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-5 top-1/2 transform -translate-y-1/2 h-8 w-8 text-purple-400">
-              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
-            </svg>
-            <input 
-              type="text" 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              placeholder={`Enter ${searchType} name (e.g., Future, Metro Boomin, SZA, The Weeknd)`} 
-              className="w-full pl-16 pr-6 py-6 text-xl bg-gray-800 border-2 border-purple-900/50 rounded-2xl focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-600 text-white placeholder-gray-400"
-              disabled={searching}
-            />
-          </div>
-
-          <button 
-            onClick={handleSearch}
-            disabled={!searchQuery.trim() || searching}
-            className="w-full py-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full font-bold text-2xl hover:from-purple-500 hover:to-pink-500 shadow-2xl shadow-purple-900/50 transition transform hover:scale-105 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-4">
-              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
-            </svg>
-            {searching ? 'Searching...' : 'Search for Missing Royalties'}
-          </button>
-
-          {/* Search Results */}
-          {searchResults.length > 0 && !selectedResult && (
-            <div className="mt-8 space-y-4">
-              <h3 className="text-2xl font-bold neon-purple mb-4">Select a Match</h3>
-              {searchResults.map((result) => (
-                <button
-                  key={result.id}
-                  onClick={() => handleSelectResult(result)}
-                  className="w-full p-6 bg-gray-800/50 hover:bg-gray-800 rounded-2xl border border-purple-900/50 flex items-center justify-between transition group"
-                >
-                  <div className="flex items-center space-x-4">
-                    <div className="w-16 h-16 bg-purple-900/50 rounded-full flex items-center justify-center">
-                      <span className="text-2xl font-bold text-purple-300">
-                        {result.name.charAt(0)}
-                      </span>
-                    </div>
-                    <div className="text-left">
-                      <h4 className="text-xl font-bold text-white">{result.name}</h4>
-                      <p className="text-purple-300">{result.role}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className={`px-4 py-2 rounded-full text-sm font-bold ${
-                      result.confidence === 'high' ? 'bg-green-600/30 text-green-400' :
-                      result.confidence === 'medium' ? 'bg-yellow-600/30 text-yellow-400' :
-                      'bg-gray-600/30 text-gray-400'
-                    }`}>
-                      {result.confidence.toUpperCase()} CONFIDENCE
-                    </span>
-                    {result.matchCount > 0 && (
-                      <p className="text-gray-400 mt-2">{result.matchCount} potential matches</p>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Loading State */}
-          {searching && searchResults.length === 0 && (
-            <div className="mt-8 text-center py-12">
-              <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-purple-600 mx-auto mb-6"></div>
-              <p className="text-xl text-purple-300">Scanning PRO databases...</p>
-              <p className="text-gray-400 mt-2">Checking ASCAP, BMI, SOCAN, PRS</p>
-            </div>
-          )}
-
-          <p className="text-center mt-6 text-gray-400 text-lg">
-            Free basic search (limited results) • Full catalog scan + detailed recovery in{' '}
-            <Link href="/free-audit" className="text-purple-400 hover:text-purple-300 underline">
-              Free Audit
+          <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+            <Link href="/signin" style={{ color: "#d1d5db", textDecoration: "none" }}>Sign In</Link>
+            <Link href="/free-audit" style={{ background: "#9333ea", color: "#fff", padding: "0.5rem 1.5rem", borderRadius: "9999px", fontWeight: 600, textDecoration: "none" }}>
+              Start Free
             </Link>
+          </div>
+        </div>
+      </nav>
+
+      {/* Main */}
+      <main style={{ paddingTop: "7rem", paddingBottom: "5rem", paddingLeft: "1.5rem", paddingRight: "1.5rem", maxWidth: "1024px", margin: "0 auto" }}>
+
+        {/* Header */}
+        <div style={{ textAlign: "center", marginBottom: "3rem" }}>
+          <h1 style={{ fontFamily: "'Orbitron', sans-serif", fontSize: "clamp(2rem, 5vw, 3.5rem)", fontWeight: 700, marginBottom: "1rem", textShadow: "0 0 10px #06b6d4, 0 0 20px #06b6d4", color: "#fff" }}>
+            Find Missing Royalties
+          </h1>
+          <p style={{ fontSize: "clamp(1rem, 2vw, 1.25rem)", color: "#d1d5db", maxWidth: "56rem", margin: "0 auto" }}>
+            Hunt down unclaimed bags from streams, syncs, performances & playlists. Scan MusicBrainz for recordings, ISRCs, and rights gaps — built for hip hop & R&B creators.
+          </p>
+          <p style={{ marginTop: "1rem", fontSize: "1.1rem", color: "#c084fc", fontWeight: 500 }}>
+            Free basic search • Real ISRC data • Direct PRO verification links
           </p>
         </div>
 
-        {/* Features / Benefits */}
-        <div className="mt-20 grid md:grid-cols-3 gap-10">
-          <div className="text-center bg-gray-900/40 rounded-2xl p-8 border border-purple-800/30">
-            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-6">
-              <circle cx="12" cy="12" r="10"/><path d="M2 12h20"/>
-            </svg>
-            <h3 className="text-2xl font-bold neon-purple mb-4">Global PRO Coverage</h3>
-            <p className="text-gray-300">Scans ASCAP, BMI, SOCAN, PRS & more — find unclaimed from viral TikToks to radio spins.</p>
+        {/* Search Card */}
+        <div style={{ background: "rgba(17,24,39,0.6)", backdropFilter: "blur(12px)", borderRadius: "1.5rem", border: "1px solid rgba(168,85,247,0.3)", padding: "3rem", boxShadow: "0 25px 50px rgba(0,0,0,0.5)" }}>
+
+          {/* Toggle */}
+          <div style={{ display: "flex", gap: "1rem", marginBottom: "2.5rem" }}>
+            {["artist", "writer"].map((type) => (
+              <button key={type} onClick={() => setSearchType(type as "artist" | "writer")}
+                style={{ flex: 1, padding: "1.25rem", borderRadius: "1rem", fontWeight: 600, fontSize: "1rem", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.75rem", background: searchType === type ? "linear-gradient(to right, #9333ea, #ec4899)" : "#1f2937", color: searchType === type ? "#fff" : "#9ca3af", transition: "all 0.2s" }}>
+                {type === "artist" ? "🎵 Search by Artist / Group" : "✍️ Search by Writer / Producer"}
+              </button>
+            ))}
           </div>
-          <div className="text-center bg-gray-900/40 rounded-2xl p-8 border border-purple-800/30">
-            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-6">
-              <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
-            </svg>
-            <h3 className="text-2xl font-bold neon-cyan mb-4">Real-Time Estimates</h3>
-            <p className="text-gray-300">Instant insights on potential missing earnings — see where your streams/synchs fell through cracks.</p>
-          </div>
-          <div className="text-center bg-gray-900/40 rounded-2xl p-8 border border-purple-800/30">
-            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-6">
-              <line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-            </svg>
-            <h3 className="text-2xl font-bold neon-purple mb-4">Claim Your Bag</h3>
-            <p className="text-gray-300">Link to recovery tools — upgrade for crypto-verified claims & payment simulation.</p>
-          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSearch}>
+            <div style={{ position: "relative", marginBottom: "2rem" }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: "absolute", left: "1.25rem", top: "50%", transform: "translateY(-50%)" }}>
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+              </svg>
+              <input type="text" value={query} onChange={(e) => setQuery(e.target.value)}
+                placeholder={searchType === "artist" ? "Enter artist name (e.g., Future, SZA, Metro Boomin)" : "Enter writer/producer name"}
+                style={{ width: "100%", paddingLeft: "4rem", paddingRight: "1.5rem", paddingTop: "1.5rem", paddingBottom: "1.5rem", fontSize: "1.1rem", background: "#1f2937", border: "2px solid rgba(168,85,247,0.3)", borderRadius: "1rem", color: "#fff", outline: "none", boxSizing: "border-box" }}
+              />
+            </div>
+            <button type="submit" disabled={loading || !query.trim()}
+              style={{ width: "100%", padding: "1.5rem", background: loading ? "#4b5563" : "linear-gradient(to right, #9333ea, #ec4899)", color: "#fff", borderRadius: "9999px", fontWeight: 700, fontSize: "1.4rem", border: "none", cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "1rem", transition: "all 0.2s" }}>
+              {loading ? "Searching..." : "🔍 Search for Missing Royalties"}
+            </button>
+          </form>
+
+          {error && (
+            <div style={{ marginTop: "1.5rem", padding: "1rem", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "0.75rem", color: "#f87171" }}>
+              Error: {error}
+            </div>
+          )}
+
+          {/* Results */}
+          {results && (
+            <div style={{ marginTop: "2rem" }}>
+              <h3 style={{ fontFamily: "'Orbitron', sans-serif", fontSize: "1.2rem", color: "#a855f7", marginBottom: "1.5rem" }}>Results</h3>
+
+              {/* Recordings Found */}
+              {results.neighboring?.length > 0 && (
+                <div style={{ marginBottom: "1.5rem" }}>
+                  <h4 style={{ color: "#c084fc", marginBottom: "0.75rem", fontWeight: 600 }}>🎵 Recordings Found</h4>
+                  {results.neighboring.map((n: any, i: number) => (
+                    <div key={i} style={{ padding: "1rem", background: "rgba(192,132,252,0.1)", borderRadius: "0.75rem", marginBottom: "0.75rem", border: "1px solid rgba(192,132,252,0.2)" }}>
+                      <div style={{ fontWeight: 600, color: "#e9d5ff" }}>{n.title}</div>
+                      <div style={{ fontSize: "0.85rem", color: "#9ca3af", marginTop: "0.4rem", display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
+                        <span>👤 {n.performer}</span>
+                        {n.release_date && <span>📅 {n.release_date}</span>}
+                        {n.label && <span>🏷️ {n.label}</span>}
+                        <span>📦 {n.source}</span>
+                        {n.isrc && <span style={{ color: "#a855f7", fontWeight: 600 }}>🎫 ISRC: {n.isrc}</span>}
+                      </div>
+                      {n.all_isrcs?.length > 1 && (
+                        <div style={{ fontSize: "0.8rem", color: "#6b7280", marginTop: "0.4rem" }}>
+                          All ISRCs: {n.all_isrcs.join(" • ")}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Publishing */}
+              {results.publishing?.length > 0 && (
+                <div style={{ marginBottom: "1.5rem" }}>
+                  <h4 style={{ color: "#34d399", marginBottom: "0.75rem", fontWeight: 600 }}>✅ Publishing Found</h4>
+                  {results.publishing.map((p: any, i: number) => (
+                    <div key={i} style={{ padding: "1rem", background: "rgba(52,211,153,0.1)", borderRadius: "0.75rem", marginBottom: "0.75rem", border: "1px solid rgba(52,211,153,0.2)" }}>
+                      <div style={{ fontWeight: 600 }}>{p.publisher}</div>
+                      <div style={{ fontSize: "0.85rem", color: "#9ca3af" }}>
+                        {p.role && `Role: ${p.role}`} {p.ipi && `• IPI: ${p.ipi}`} {p.source && `• ${p.source}`}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* PRO */}
+              {results.pro?.length > 0 && (
+                <div style={{ marginBottom: "1.5rem" }}>
+                  <h4 style={{ color: "#60a5fa", marginBottom: "0.75rem", fontWeight: 600 }}>✅ PRO Registrations Found</h4>
+                  {results.pro.map((p: any, i: number) => (
+                    <div key={i} style={{ padding: "1rem", background: "rgba(96,165,250,0.1)", borderRadius: "0.75rem", marginBottom: "0.75rem", border: "1px solid rgba(96,165,250,0.2)" }}>
+                      <div style={{ fontWeight: 600 }}>{p.writer}</div>
+                      <div style={{ fontSize: "0.85rem", color: "#9ca3af" }}>
+                        {p.pro && `PRO: ${p.pro}`} {p.ipi && `• IPI: ${p.ipi}`}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Missing Rights with Action Links */}
+              {results.missing?.length > 0 && (
+                <div style={{ marginBottom: "1.5rem" }}>
+                  <h4 style={{ color: "#f87171", marginBottom: "0.75rem", fontWeight: 600 }}>⚠️ Potential Missing Rights</h4>
+                  {results.missing.map((m: any, i: number) => {
+                    const color = missingColors[m.type] || missingColors.default;
+                    const icon = missingIcons[m.type] || missingIcons.default;
+                    return (
+                      <div key={i} style={{ padding: "1rem", background: `rgba(0,0,0,0.3)`, borderRadius: "0.75rem", marginBottom: "0.75rem", border: `1px solid ${color}40` }}>
+                        <div style={{ color: "#e5e7eb", marginBottom: "0.5rem" }}>{icon} {m.reason}</div>
+                        {m.link && (
+                          <a href={m.link} target="_blank" rel="noopener noreferrer"
+                            style={{ display: "inline-block", marginTop: "0.25rem", padding: "0.4rem 1rem", background: `${color}20`, border: `1px solid ${color}60`, borderRadius: "0.5rem", color: color, fontSize: "0.85rem", fontWeight: 600, textDecoration: "none" }}>
+                            {m.action} →
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Direct PRO Search Links */}
+                  {results.search && (
+                    <div style={{ marginTop: "1rem", padding: "1.25rem", background: "rgba(168,85,247,0.1)", borderRadius: "0.75rem", border: "1px solid rgba(168,85,247,0.3)" }}>
+                      <p style={{ color: "#c084fc", fontWeight: 600, marginBottom: "0.75rem" }}>🔎 Search directly on PRO databases:</p>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
+                        <a href={results.search.ascap_link} target="_blank" rel="noopener noreferrer"
+                          style={{ padding: "0.5rem 1.25rem", background: "#1f2937", border: "1px solid #f59e0b60", borderRadius: "0.5rem", color: "#f59e0b", fontWeight: 600, textDecoration: "none", fontSize: "0.9rem" }}>
+                          ASCAP Repertory →
+                        </a>
+                        <a href={results.search.bmi_link} target="_blank" rel="noopener noreferrer"
+                          style={{ padding: "0.5rem 1.25rem", background: "#1f2937", border: "1px solid #3b82f660", borderRadius: "0.5rem", color: "#3b82f6", fontWeight: 600, textDecoration: "none", fontSize: "0.9rem" }}>
+                          BMI Repertoire →
+                        </a>
+                        <a href="https://www.soundexchange.com/performer-copyright-owner/claim-royalties/" target="_blank" rel="noopener noreferrer"
+                          style={{ padding: "0.5rem 1.25rem", background: "#1f2937", border: "1px solid #10b98160", borderRadius: "0.5rem", color: "#10b981", fontWeight: 600, textDecoration: "none", fontSize: "0.9rem" }}>
+                          SoundExchange →
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* No results */}
+              {results.publishing?.length === 0 && results.pro?.length === 0 && results.neighboring?.length === 0 && results.missing?.length === 0 && (
+                <div style={{ textAlign: "center", color: "#9ca3af", padding: "2rem" }}>
+                  No results found. Try a different name or <Link href="/free-audit" style={{ color: "#a855f7" }}>run a full audit</Link>.
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Upsell CTA */}
-        <div className="mt-16 text-center">
-          <h2 className="text-4xl font-bold neon-cyan mb-6">Ready to Recover What's Yours?</h2>
-          <p className="text-xl text-gray-300 mb-8">Basic search shows gaps — full power (unlimited, monitoring, on-chain proof) in Royalty Accelerator.</p>
-          <Link 
-            href="/founding-member" 
-            className="inline-block bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-bold py-6 px-12 rounded-full text-2xl shadow-2xl shadow-pink-900/50 transition transform hover:scale-105"
-          >
+        {/* Features */}
+        <div style={{ marginTop: "5rem", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "2.5rem" }}>
+          {[
+            { icon: "🔍", title: "Global PRO Coverage", desc: "Scans MusicBrainz + direct links to ASCAP, BMI, SOCAN, PRS — find unclaimed from viral TikToks to radio spins.", color: "#a855f7" },
+            { icon: "🎫", title: "Real ISRC Data", desc: "Pull real ISRCs from MusicBrainz to verify neighboring rights and SoundExchange claims.", color: "#06b6d4" },
+            { icon: "💰", title: "Claim Your Bag", desc: "Direct links to every PRO and rights org — no more guessing where to go.", color: "#10b981" }
+          ].map((f, i) => (
+            <div key={i} style={{ textAlign: "center", background: "rgba(17,24,39,0.4)", borderRadius: "1rem", padding: "2rem", border: "1px solid rgba(168,85,247,0.2)" }}>
+              <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>{f.icon}</div>
+              <h3 style={{ fontFamily: "'Orbitron', sans-serif", fontSize: "1.1rem", fontWeight: 700, marginBottom: "1rem", textShadow: `0 0 10px ${f.color}`, color: "#fff" }}>{f.title}</h3>
+              <p style={{ color: "#d1d5db" }}>{f.desc}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* CTA */}
+        <div style={{ marginTop: "4rem", textAlign: "center" }}>
+          <h2 style={{ fontFamily: "'Orbitron', sans-serif", fontSize: "clamp(1.5rem, 4vw, 2.5rem)", fontWeight: 700, marginBottom: "1.5rem", textShadow: "0 0 10px #06b6d4", color: "#fff" }}>
+            Ready to Recover What's Yours?
+          </h2>
+          <p style={{ fontSize: "1.2rem", color: "#d1d5db", marginBottom: "2rem" }}>
+            Full catalog scan, monitoring, and recovery tools in Royalty Accelerator.
+          </p>
+          <Link href="/accelerator" style={{ display: "inline-block", background: "linear-gradient(to right, #ec4899, #9333ea)", color: "#fff", fontWeight: 700, padding: "1.5rem 3rem", borderRadius: "9999px", fontSize: "1.4rem", textDecoration: "none", boxShadow: "0 20px 40px rgba(236,72,153,0.3)" }}>
             Join Accelerator – Limited Spots
           </Link>
         </div>
       </main>
 
-      {/* Email Capture Modal */}
-      {showEmailModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 rounded-3xl border-2 border-purple-500 p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            {!emailSent ? (
-              <>
-                <h3 className="text-3xl font-bold neon-cyan mb-4">
-                  We Found <span className="text-green-400">{formatCurrency(totalEstimated)}</span> in Potential Royalties!
-                </h3>
-                
-                {/* Results Preview */}
-                <div className="space-y-4 mb-6 max-h-80 overflow-y-auto">
-                  {trackResults.map((track, index) => (
-                    <div key={index} className="bg-gray-800/50 p-4 rounded-xl border border-purple-800/30">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <h4 className="text-xl font-bold text-white">{track.title}</h4>
-                          <p className="text-purple-300">{track.artist}</p>
-                        </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          track.confidence === 'high' ? 'bg-green-600/30 text-green-400' :
-                          track.confidence === 'medium' ? 'bg-yellow-600/30 text-yellow-400' :
-                          'bg-gray-600/30 text-gray-400'
-                        }`}>
-                          {track.confidence.toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4 text-sm mt-2">
-                        <div>
-                          <p className="text-gray-400">Source</p>
-                          <p className="text-white">{track.source}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-400">Platform</p>
-                          <p className="text-white">{track.platform}</p>
-                        </div>
-                      </div>
-                      <p className="text-2xl font-bold text-green-400 mt-3 text-right">
-                        {formatCurrency(track.estimatedAmount)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Email Input */}
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email to see full results"
-                  className="w-full px-6 py-4 mb-4 bg-gray-800 border-2 border-purple-900/50 rounded-2xl focus:outline-none focus:border-purple-500 text-white text-lg"
-                />
-
-                <button
-                  onClick={handleEmailSubmit}
-                  disabled={!email.includes('@')}
-                  className="w-full py-5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full font-bold text-xl hover:from-purple-500 hover:to-pink-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Send My Results
-                </button>
-
-                <p className="text-center text-gray-400 mt-4">
-                  We'll never spam you. Unsubscribe anytime.
-                </p>
-              </>
-            ) : (
-              <div className="text-center py-8">
-                <div className="w-20 h-20 bg-green-600/30 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <svg className="text-green-400" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>
-                  </svg>
-                </div>
-                <h3 className="text-3xl font-bold text-green-400 mb-4">Check Your Inbox!</h3>
-                <p className="text-xl text-gray-300">We've sent your royalty report to</p>
-                <p className="text-xl text-purple-400 font-bold mt-2">{email}</p>
-              </div>
-            )}
-          </div>
+      {/* Footer */}
+      <footer style={{ padding: "3rem 1.5rem", background: "#000", borderTop: "1px solid rgba(168,85,247,0.2)", textAlign: "center", color: "#6b7280" }}>
+        <p>© 2026 TrapRoyalties Pro. Built for the culture. All rights reserved.</p>
+        <div style={{ marginTop: "1rem", display: "flex", justifyContent: "center", gap: "1.5rem" }}>
+          <Link href="/privacy" style={{ color: "#6b7280", textDecoration: "none" }}>Privacy</Link>
+          <Link href="/terms" style={{ color: "#6b7280", textDecoration: "none" }}>Terms</Link>
+          <Link href="/contact" style={{ color: "#6b7280", textDecoration: "none" }}>Contact</Link>
         </div>
-      )}
-
-      <Footer />
+      </footer>
     </div>
   );
 }

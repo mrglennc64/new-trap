@@ -1,21 +1,9 @@
-import type { Metadata } from 'next'
-import { Inter, Orbitron } from 'next/font/google'
 import './globals.css'
-
-const inter = Inter({ 
-  subsets: ['latin'],
-  variable: '--font-inter',
-})
-
-const orbitron = Orbitron({ 
-  subsets: ['latin'],
-  variable: '--font-orbitron',
-  weight: ['400', '600', '700'],
-})
+import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'TrapRoyalties Pro',
-  description: 'Get Your Bag From Every Stream, Sync & Performance',
+  title: 'TrapRoyalties Pro - Attorney Portal',
+  description: 'Forensic royalty auditing and legal document generation',
 }
 
 export default function RootLayout({
@@ -24,8 +12,12 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${orbitron.variable}`}>
-      <body className="font-sans antialiased">{children}</body>
+    <html lang="en">
+      <head>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </head>
+      <body className="antialiased">{children}</body>
     </html>
   )
 }

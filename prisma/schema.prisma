@@ -1,0 +1,15 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+model UnclaimedRoyalty {
+  id        Int      @id @default(autoincrement())
+  isrc      String
+  title     String?
+  artist    String?
+  source    String?
+  createdAt DateTime @default(now())
+}

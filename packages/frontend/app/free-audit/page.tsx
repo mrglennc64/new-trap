@@ -167,7 +167,7 @@ export default function FreeAuditPage() {
                 className={`upload-zone rounded-2xl p-12 text-center mb-8 transition-all cursor-pointer border-2 border-dashed ${
                   isProcessing ? 'border-purple-400 bg-purple-900/20' : 'border-purple-600 bg-purple-900/5 hover:border-purple-400 hover:bg-purple-900/10'
                 }`}
-                onClick={() => fileInputRef.current?.click()}
+                onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
               >
