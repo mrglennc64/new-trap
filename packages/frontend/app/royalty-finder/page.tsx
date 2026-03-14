@@ -1,138 +1,174 @@
 'use client';
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import ISRCConfirmationModal from '@/components/ISRCConfirmationModal';
+import { useDemoMode } from '../lib/DemoModeProvider';
+import { DEMO_ROYALTY_RESULT, DEMO_ISRC } from '../lib/demoData';
 
-interface AuditResult {
-  score: number;
-  status: string;
-  risk_level: string;
-  risk_color: string;
-  summary: string;
-  estimated_loss: string;
-  flags: Array<{
-    icon: string;
-    title: string;
-    description: string;
-  }>;
-  revenue_impact: any;
-  action_items: string[];
-  song_title: string;
-  artist: string;
-  mbid?: string;
-  recording_id?: string;
-  streaming_stats: any;
-  isrc: string;
-  resolution?: {
-    method: string;
-    confidence: string;
-    original_isrc: string;
-    working_isrc?: string;
-    mapping_id?: number;
-    usage_count?: number;
-  };
-  from_mapping?: boolean;
-}
+const ISRC_RE = /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/i;
+const ISRC_PARTIAL_RE = /^[A-Z]{2}[A-Z0-9]{3}\d{2,6}$/i; // looks like an ISRC but wrong length
 
 export default function RoyaltyFinderPage() {
-  const [searchType, setSearchType] = useState('isrc');
+  return (
+    <Suspense>
+      <RoyaltyFinderContent />
+    </Suspense>
+  );
+}
+
+function RoyaltyFinderContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const { demoMode, consumeProbe } = useDemoMode();
+  const [searchType, setSearchType] = useState('artist');
+  const [artistQuery, setArtistQuery] = useState('');
   const [isrc, setIsrc] = useState('');
-  const [artist, setArtist] = useState('');
-  const [track, setTrack] = useState('');
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<AuditResult | null>(null);
+  const [results, setResults] = useState<any>(null);
   const [error, setError] = useState('');
-  
-  // Confirmation modal state
-  const [showConfirmation, setShowConfirmation] = useState(false);
-  const [pendingMapping, setPendingMapping] = useState<{
-    originalIsrc: string;
-    suggestedTrack: {
-      title: string;
-      artist: string;
-      isrc: string;
-      mbid?: string;
-      recording_id?: string;
-      confidence?: string;
-    };
-  } | null>(null);
 
-  // Load recent ISRCs from localStorage
-  const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  
-  useEffect(() => {
-    const stored = localStorage.getItem('recentIsrcs');
-    if (stored) {
-      setRecentSearches(JSON.parse(stored));
+  // Per-artist expanded state: mbid → { open, loadingIsrcs, recordings }
+  const [acrData, setAcrData] = useState<any>(null);
+  const [expanded, setExpanded] = useState<Record<string, { open: boolean; loading: boolean; recordings: any[] }>>({});
+
+  const toggleArtist = async (mbid: string) => {
+    if (expanded[mbid]?.open) {
+      setExpanded(p => ({ ...p, [mbid]: { ...p[mbid], open: false } }));
+      return;
     }
-  }, []);
-
-  const saveRecentSearch = (isrc: string) => {
-    const updated = [isrc, ...recentSearches.filter(s => s !== isrc)].slice(0, 5);
-    setRecentSearches(updated);
-    localStorage.setItem('recentIsrcs', JSON.stringify(updated));
+    if (expanded[mbid]?.recordings?.length) {
+      setExpanded(p => ({ ...p, [mbid]: { ...p[mbid], open: true } }));
+      return;
+    }
+    // Fetch ISRCs
+    setExpanded(p => ({ ...p, [mbid]: { open: true, loading: true, recordings: [] } }));
+    try {
+      const res = await fetch(`/api/royalty-finder/artist/${mbid}/recordings?limit=15`);
+      const data = await res.json();
+      setExpanded(p => ({ ...p, [mbid]: { open: true, loading: false, recordings: data.recordings || [] } }));
+    } catch {
+      setExpanded(p => ({ ...p, [mbid]: { open: true, loading: false, recordings: [] } }));
+    }
   };
+
+  // Demo mode: auto-populate and trigger search
+  useEffect(() => {
+    if (demoMode) {
+      setSearchType('isrc');
+      setIsrc(DEMO_ISRC);
+      setTimeout(() => document.getElementById('search-btn')?.click(), 300);
+    }
+  }, [demoMode]);
+
+  // Pre-populate from landing page query and auto-search
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (!q) return;
+    const clean = q.trim().replace(/-/g, '').toUpperCase();
+    if (ISRC_RE.test(clean)) {
+      setSearchType('isrc');
+      setIsrc(q.trim());
+      // auto-trigger search
+      setTimeout(() => document.getElementById('search-btn')?.click(), 100);
+    } else {
+      setSearchType('artist');
+      setArtistQuery(q.trim());
+      setTimeout(() => document.getElementById('search-btn')?.click(), 100);
+    }
+  }, [searchParams]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     setResults(null);
-    setPendingMapping(null);
+    setAcrData(null);
+
+    if (demoMode) {
+      await new Promise(r => setTimeout(r, 800));
+      setResults(DEMO_ROYALTY_RESULT);
+      setLoading(false);
+      return;
+    }
+
+    if (!consumeProbe()) {
+      setError('Live probe quota reached. Switching back to Demo Mode.');
+      setLoading(false);
+      return;
+    }
 
     try {
-      let payload: any = {};
-      
-      if (searchType === 'isrc') {
-        if (!isrc.trim()) throw new Error('Please enter an ISRC code');
-        const cleanIsrc = isrc.toUpperCase().replace(/-/g, '').trim();
-        payload.isrc = cleanIsrc;
-        saveRecentSearch(cleanIsrc);
+      let url = '';
+      const options: RequestInit = {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      };
+
+      if (searchType === 'artist') {
+        if (!artistQuery.trim()) {
+          throw new Error('Please enter an artist name');
+        }
+        const clean = artistQuery.trim().replace(/-/g, '').toUpperCase();
+        if (ISRC_RE.test(clean)) {
+          // User entered a full ISRC in the artist field — switch to ISRC audit
+          setSearchType('isrc');
+          setIsrc(artistQuery.trim());
+          url = `/api/royalty-finder/audit`;
+          options.method = 'POST';
+          options.body = JSON.stringify({ isrc: clean });
+        } else if (ISRC_PARTIAL_RE.test(clean)) {
+          throw new Error(`"${artistQuery.trim()}" looks like an incomplete ISRC. ISRCs are 12 characters (e.g. USUM71703861). Check your code and try again.`);
+        } else {
+          url = `/api/royalty-finder/search/artist?query=${encodeURIComponent(artistQuery)}`;
+        }
       } else {
-        if (!artist.trim() || !track.trim()) throw new Error('Please enter both artist and track');
-        payload.artist = artist.trim();
-        payload.track = track.trim();
+        if (!isrc.trim()) {
+          throw new Error('Please enter an ISRC code');
+        }
+        url = `/api/royalty-finder/audit`;
+        options.method = 'POST';
+        options.body = JSON.stringify({ isrc: isrc.toUpperCase().replace(/-/g, '') });
       }
 
-      console.log('Searching with payload:', payload);
-
-      const response = await fetch('/api/royalty-finder/audit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
+      const response = await fetch(url, options);
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(data.detail || 'Search failed');
       }
 
-      console.log('Got results:', data);
+      setResults(data);
 
-      // Check if we need confirmation (resolution found but not strict match and not saved mapping)
-      if (data.resolution && 
-          data.resolution.method !== 'strict_isrc' && 
-          data.resolution.method !== 'saved_mapping' &&
-          data.resolution.working_isrc) {
-        
-        // Show confirmation modal
-        setPendingMapping({
-          originalIsrc: payload.isrc,
-          suggestedTrack: {
-            title: data.song_title,
-            artist: data.artist,
-            isrc: data.resolution.working_isrc,
-            mbid: data.mbid,
-            recording_id: data.recording_id,
-            confidence: data.resolution.confidence
-          }
+      // If audit route already bundled ACRCloud data (e.g. MB miss), use it immediately
+      if (data.acr) {
+        // Normalise to the shape the ACRCloud panel expects
+        setAcrData({
+          name: data.acr.name,
+          artists: data.acr.artist ? [data.acr.artist] : [],
+          album: {
+            title: data.acr.album_title ?? null,
+            label: data.acr.album_label ?? null,
+            cover: data.acr.album_cover ?? null,
+            upc:   null,
+          },
+          release_date: data.acr.release_date ?? null,
+          works: data.acr.iswc || data.acr.contributors?.length
+            ? [{ iswc: data.acr.iswc, contributors: data.acr.contributors ?? [] }]
+            : [],
+          platforms: data.acr.platforms ?? {},
         });
-        setShowConfirmation(true);
       }
 
-      setResults(data);
+      // Fetch ACRCloud enrichment for ISRC searches (enriches MB results too)
+      const finalIsrc = options.body
+        ? JSON.parse(options.body as string).isrc
+        : null;
+      if (finalIsrc && !data.acr) {
+        fetch(`/api/acrcloud?isrc=${finalIsrc}&include_works=1`)
+          .then(r => r.ok ? r.json() : null)
+          .then(acr => { if (acr?.tracks?.[0]) setAcrData(acr.tracks[0]); })
+          .catch(() => {});
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -140,114 +176,67 @@ export default function RoyaltyFinderPage() {
     }
   };
 
-  const handleConfirmMapping = async () => {
-    // After confirmation, refresh the search to show the saved mapping working
-    if (pendingMapping) {
-      setLoading(true);
-      try {
-        const response = await fetch('/api/royalty-finder/audit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ isrc: pendingMapping.originalIsrc })
-        });
-        const data = await response.json();
-        setResults(data);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
-
-  const getRiskBadge = (color: string, level: string) => {
-    const colors = {
-      green: 'bg-green-100 text-green-800 border-green-200',
-      yellow: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      red: 'bg-red-100 text-red-800 border-red-200'
-    };
-    const icons = {
-      green: '✅',
-      yellow: '⚠️',
-      red: '🚨'
-    };
-    
-    return (
-      <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border ${colors[color as keyof typeof colors] || colors.green}`}>
-        <span>{icons[color as keyof typeof icons]}</span>
-        <span className="font-medium">{level}</span>
-        <span className="text-sm opacity-75">Score: {results?.score}</span>
-      </div>
-    );
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-12">
-      <div className="max-w-4xl mx-auto px-4">
+    <div className="min-h-screen bg-[#0a0f1e] py-12">
+      <div className="max-w-6xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
-          <Link href="/" className="text-indigo-600 hover:text-indigo-800 mb-4 inline-block font-medium">
+          <Link href="/" className="text-indigo-400 hover:text-indigo-300 mb-4 inline-block">
             ← Back to Home
           </Link>
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Royalty Finder</h1>
-          <p className="text-lg text-gray-800 flex items-center gap-2">
-            Search MusicBrainz for recordings, ISRCs, and metadata gaps.
-            {results?.from_mapping && (
-              <span className="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                ✅ Resolved from saved mapping
-              </span>
-            )}
+          <h1 className="text-4xl font-bold text-white mb-4">Find Missing Royalties</h1>
+          <p className="text-lg text-slate-300">
+            Hunt down unclaimed bags from streams, syncs, performances & playlists. 
+            Scan SMPT for recordings, ISRCs, and rights gaps — built for hip hop & R&B creators.
           </p>
         </div>
 
-        {/* Recent Searches */}
-        {recentSearches.length > 0 && (
-          <div className="mb-4 flex items-center gap-2 text-sm">
-            <span className="text-gray-600">Recent:</span>
-            {recentSearches.map((s, i) => (
-              <button
-                key={i}
-                onClick={() => {
-                  setIsrc(s);
-                  setSearchType('isrc');
-                }}
-                className="px-3 py-1 bg-white border border-gray-300 rounded-full text-gray-700 hover:bg-indigo-50 hover:border-indigo-300 transition"
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Search Form */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-8 border border-gray-200">
+        {/* Search Type Toggle */}
+        <div className="bg-[#0f172a] rounded-xl shadow-lg p-6 mb-8 border border-white/10">
           <div className="flex gap-4 mb-6">
-            <button
-              onClick={() => setSearchType('isrc')}
-              className={`px-6 py-3 rounded-lg font-medium transition ${
-                searchType === 'isrc' 
-                  ? 'bg-indigo-900 text-white shadow-md' 
-                  : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-              }`}
-            >
-              🔍 Search by ISRC
-            </button>
             <button
               onClick={() => setSearchType('artist')}
               className={`px-6 py-3 rounded-lg font-medium transition ${
                 searchType === 'artist' 
-                  ? 'bg-indigo-900 text-white shadow-md' 
-                  : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                  ? 'bg-indigo-600 text-white' 
+                  : 'bg-white/10 text-slate-300 hover:bg-white/10'
               }`}
             >
-              🎤 Search by Artist + Track
+              Search by Artist
+            </button>
+            <button
+              onClick={() => setSearchType('isrc')}
+              className={`px-6 py-3 rounded-lg font-medium transition ${
+                searchType === 'isrc' 
+                  ? 'bg-indigo-600 text-white' 
+                  : 'bg-white/10 text-slate-300 hover:bg-white/10'
+              }`}
+            >
+              Lookup by ISRC
             </button>
           </div>
 
           <form onSubmit={handleSearch} className="space-y-4">
-            {searchType === 'isrc' ? (
+            {searchType === 'artist' ? (
               <div>
-                <label className="block text-sm font-medium text-gray-800 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Artist Name
+                </label>
+                <input
+                  type="text"
+                  value={artistQuery}
+                  onChange={(e) => setArtistQuery(e.target.value)}
+                  placeholder="e.g., Drake, Travis Scott, Kendrick Lamar"
+                  className="w-full px-4 py-3 border border-white/10 rounded-lg focus:ring-2 focus:ring-indigo-500 text-white bg-[#0f172a] placeholder-slate-500"
+                  required
+                />
+                <p className="text-sm text-slate-400 mt-2">
+                  Search SMPT for artist information
+                </p>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
                   ISRC Code
                 </label>
                 <input
@@ -255,212 +244,345 @@ export default function RoyaltyFinderPage() {
                   value={isrc}
                   onChange={(e) => setIsrc(e.target.value)}
                   placeholder="e.g., USUM71703861"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-gray-900 bg-white placeholder-gray-500"
+                  className="w-full px-4 py-3 border border-white/10 rounded-lg focus:ring-2 focus:ring-indigo-500 text-white bg-[#0f172a] placeholder-slate-500"
                   required
                 />
-                <p className="text-sm text-gray-600 mt-2">
-                  Example: USUM71703861 (Carly Rae Jepsen - Cut to the Feeling)
+                <p className="text-sm text-slate-400 mt-2">
+                  Example: USUM71703861 (Drake - God's Plan)
                 </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-800 mb-2">
-                    Artist Name
-                  </label>
-                  <input
-                    type="text"
-                    value={artist}
-                    onChange={(e) => setArtist(e.target.value)}
-                    placeholder="Future"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-gray-900 bg-white placeholder-gray-500"
-                    required={searchType === 'artist'}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-800 mb-2">
-                    Track Title
-                  </label>
-                  <input
-                    type="text"
-                    value={track}
-                    onChange={(e) => setTrack(e.target.value)}
-                    placeholder="Mask Off"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-gray-900 bg-white placeholder-gray-500"
-                    required={searchType === 'artist'}
-                  />
+                {/* MLC cross-link */}
+                <div className="mt-3 flex items-center gap-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                  <span className="text-indigo-400 text-sm">🔎 Also check for unclaimed mechanical royalties in the MLC database:</span>
+                  <Link
+                    href={`/mlc-search${isrc ? `?q=${encodeURIComponent(isrc)}` : ''}`}
+                    className="flex-shrink-0 px-3 py-1.5 bg-indigo-700 hover:bg-indigo-600 text-white text-xs font-bold rounded-lg transition"
+                  >
+                    Search MLC →
+                  </Link>
                 </div>
               </div>
             )}
 
             <button
+              id="search-btn"
               type="submit"
               disabled={loading}
-              className="w-full bg-indigo-900 text-white py-3 px-6 rounded-lg font-semibold hover:bg-indigo-800 disabled:opacity-50 transition flex items-center justify-center gap-2"
+              className="w-full bg-indigo-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-indigo-700 disabled:opacity-50 transition"
             >
-              {loading ? (
-                <>
-                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Searching MusicBrainz...
-                </>
-              ) : (
-                '🔍 Find Royalties'
-              )}
+              {loading ? '🔍 Searching SMPT...' : '🔍 Find Royalties'}
             </button>
           </form>
 
           {error && (
             <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-800 font-medium flex items-center gap-2">
-                <span>❌</span> {error}
-              </p>
+              <p className="text-red-800 font-medium">{error}</p>
             </div>
           )}
         </div>
 
         {/* Results */}
         {results && (
-          <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
-            <div className="flex justify-between items-start mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Audit Results</h2>
-              {results.risk_color && getRiskBadge(results.risk_color, results.risk_level)}
-            </div>
+          <div className="bg-[#0f172a] rounded-xl shadow-lg p-6 border border-white/10">
+            <h2 className="text-2xl font-bold text-white mb-6">Results from SMPT</h2>
             
-            {/* Risk Summary */}
-            {results.risk_level && (
-              <div className={`mb-6 p-4 rounded-lg border ${
-                results.risk_color === 'green' ? 'bg-green-50 border-green-200' :
-                results.risk_color === 'yellow' ? 'bg-yellow-50 border-yellow-200' :
-                'bg-red-50 border-red-200'
-              }`}>
-                <p className="text-sm font-medium">{results.summary}</p>
-                {results.estimated_loss && (
-                  <p className="text-sm mt-2 font-bold">
-                    Estimated Loss: {results.estimated_loss}
-                  </p>
-                )}
-              </div>
-            )}
+            {searchType === 'artist' && results.artists && (
+              <div className="space-y-3">
+                {results.artists.map((artist: any) => {
+                  const state = expanded[artist.mbid];
+                  return (
+                    <div key={artist.mbid} className="border border-slate-700 rounded-lg overflow-hidden">
+                      {/* Artist row — click to expand */}
+                      <button
+                        onClick={() => toggleArtist(artist.mbid)}
+                        className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-800/40 transition text-left"
+                      >
+                        <div>
+                          <p className="text-sm font-semibold text-slate-100">{artist.name}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {[artist.type, artist.country, artist.disambiguation].filter(Boolean).join(' · ')}
+                            {' · '}
+                            <span className="font-mono">{artist.mbid.slice(0,8)}…</span>
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0 ml-4">
+                          <span className="text-[11px] font-bold text-indigo-400">{artist.score}%</span>
+                          <span className="text-xs text-slate-400 border border-slate-600 px-2 py-0.5 rounded">
+                            {state?.open ? '▲ Hide ISRCs' : '▼ Get ISRCs'}
+                          </span>
+                        </div>
+                      </button>
 
-            {/* Track Info */}
-            <div className="space-y-4">
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-gray-700">
-                  <span className="font-medium">Track:</span> {results.song_title || 'Unknown'}
-                </p>
-                <p className="text-gray-700">
-                  <span className="font-medium">Artist:</span> {results.artist || 'Unknown'}
-                </p>
-                <p className="text-gray-700">
-                  <span className="font-medium">ISRC:</span> {results.isrc || 'Unknown'}
-                </p>
-                {results.mbid && (
-                  <p className="text-xs text-gray-500 mt-2 font-mono">
-                    MBID: {results.mbid}
-                  </p>
-                )}
-              </div>
-
-              {/* Resolution Info */}
-              {results.resolution && results.resolution.method !== 'strict_isrc' && (
-                <div className={`p-4 rounded-lg border ${
-                  results.resolution.method === 'saved_mapping' 
-                    ? 'bg-green-50 border-green-200' 
-                    : 'bg-yellow-50 border-yellow-200'
-                }`}>
-                  <p className="font-medium flex items-center gap-2">
-                    {results.resolution.method === 'saved_mapping' ? '✅' : '🔍'} 
-                    Resolution Method: {results.resolution.method === 'saved_mapping' ? 'Saved Mapping' : 'Fuzzy Match'}
-                  </p>
-                  {results.resolution.working_isrc && (
-                    <p className="text-sm mt-1">
-                      Working ISRC: <span className="font-mono">{results.resolution.working_isrc}</span>
-                    </p>
-                  )}
-                  {results.resolution.usage_count && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Used {results.resolution.usage_count} times
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Flags/Issues */}
-            {results.flags && results.flags.length > 0 && (
-              <div className="mt-6">
-                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span>🚩</span> Detected Issues
-                </h3>
-                <div className="space-y-2">
-                  {results.flags.map((flag, idx) => (
-                    <div key={idx} className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm">
-                      <span className="font-medium text-red-800">{flag.icon} {flag.title}</span>
-                      <p className="text-red-700 mt-1">{flag.description}</p>
+                      {/* Expanded: recordings / ISRCs */}
+                      {state?.open && (
+                        <div className="border-t border-slate-700 bg-[#080d1a]">
+                          {state.loading && (
+                            <p className="px-4 py-3 text-xs text-slate-400">Loading recordings from SMPT...</p>
+                          )}
+                          {!state.loading && state.recordings.length === 0 && (
+                            <p className="px-4 py-3 text-xs text-slate-500">No ISRC-linked recordings found in SMPT.</p>
+                          )}
+                          {!state.loading && state.recordings.map((rec: any) => (
+                            <div key={rec.id} className="flex items-center justify-between px-4 py-2.5 border-b border-slate-800/60 last:border-0 hover:bg-slate-800/20 transition">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-medium text-slate-200 truncate">{rec.title}</p>
+                                {rec.primary_isrc ? (
+                                  <p className="text-[10px] font-mono text-indigo-400 mt-0.5">{rec.primary_isrc}</p>
+                                ) : (
+                                  <p className="text-[10px] text-slate-600 mt-0.5">No ISRC on record</p>
+                                )}
+                              </div>
+                              {rec.primary_isrc && (
+                                <button
+                                  onClick={() => router.push(`/free-audit?isrc=${rec.primary_isrc}`)}
+                                  className="ml-3 flex-shrink-0 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold rounded transition"
+                                >
+                                  Forensic Audit →
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
             )}
 
-            {/* Action Items */}
-            {results.action_items && results.action_items.length > 0 && (
-              <div className="mt-6">
-                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span>📋</span> Recommended Actions
-                </h3>
-                <ul className="list-disc list-inside space-y-1 text-gray-700">
-                  {results.action_items.map((item, idx) => (
-                    <li key={idx}>{item}</li>
-                  ))}
-                </ul>
+            {searchType === 'isrc' && results && (
+              <div className="space-y-4">
+                {/* Track header + risk score */}
+                {results.found === false ? (
+                  <div className="p-5 bg-red-900/20 border border-red-500/40 rounded-xl">
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="text-2xl">⚠️</span>
+                      <div>
+                        <p className="font-bold text-red-300">ISRC Not Registered</p>
+                        <p className="text-sm text-slate-400">{results.isrc} — not found in MusicBrainz</p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-slate-300 mb-4">This ISRC has no public registration. Publishing revenue may be uncollectable until registered.</p>
+                    <div className="flex gap-2 flex-wrap">
+                      <Link href="/mlc-search" className="px-3 py-1.5 bg-indigo-700 hover:bg-indigo-600 text-white text-xs font-bold rounded-lg transition">🔎 Check MLC</Link>
+                      <Link href="/cwr-generator" className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-indigo-300 text-xs font-bold rounded-lg border border-indigo-500/30 transition">📋 Register Now (CWR)</Link>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Track card */}
+                    <div className="flex items-start justify-between p-5 bg-slate-800/40 border border-slate-700 rounded-xl">
+                      <div>
+                        <p className="text-lg font-bold text-white">{results.song_title}</p>
+                        <p className="text-sm text-slate-400 mt-0.5">
+                          {results.artist && <span>{results.artist} · </span>}
+                          <span className="font-mono">{results.isrc}</span>
+                          {results.releases?.[0]?.date && <span> · {results.releases[0].date.slice(0,4)}</span>}
+                        </p>
+                        {results.source === 'acrcloud' && (
+                          <span className="inline-block mt-1 px-2 py-0.5 bg-indigo-800/50 border border-indigo-500/40 rounded text-[10px] text-indigo-300 font-bold">
+                            🎵 Found via ACRCloud — not yet in MusicBrainz
+                          </span>
+                        )}
+                        {results.audiodb?.genre && (
+                          <p className="text-xs text-indigo-400 mt-1">Genre: {results.audiodb.genre}{results.audiodb.mood ? ` · Mood: ${results.audiodb.mood}` : ''}</p>
+                        )}
+                      </div>
+                      <div className="flex-shrink-0 ml-4 text-center">
+                        <div className={`text-3xl font-black ${results.score === 0 ? 'text-green-400' : results.score <= 25 ? 'text-yellow-400' : results.score <= 50 ? 'text-orange-400' : 'text-red-400'}`}>
+                          {results.score}
+                        </div>
+                        <p className="text-[10px] text-slate-500 uppercase font-bold">Risk/100</p>
+                      </div>
+                    </div>
+
+                    {/* ListenBrainz stats */}
+                    {results.listen_stats && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3 bg-indigo-900/20 border border-indigo-500/30 rounded-lg text-center">
+                          <p className="text-xl font-black text-indigo-300">{(results.listen_stats.total_listen_count || 0).toLocaleString()}</p>
+                          <p className="text-[10px] text-slate-500 uppercase font-bold mt-0.5">Total Listens (LB)</p>
+                        </div>
+                        <div className="p-3 bg-indigo-900/20 border border-indigo-500/30 rounded-lg text-center">
+                          <p className="text-xl font-black text-indigo-300">{(results.listen_stats.total_user_count || 0).toLocaleString()}</p>
+                          <p className="text-[10px] text-slate-500 uppercase font-bold mt-0.5">Unique Listeners</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Gap Finder */}
+                    {results.gaps?.length > 0 && (
+                      <div className="border border-orange-500/30 rounded-xl overflow-hidden">
+                        <div className="px-4 py-2 bg-orange-500/10 border-b border-orange-500/20 flex items-center gap-2">
+                          <span className="text-orange-400 text-sm font-black">⚡ GAP FINDER</span>
+                          <span className="text-xs text-orange-300">{results.gaps.length} royalty gap{results.gaps.length !== 1 ? 's' : ''} detected</span>
+                        </div>
+                        <div className="divide-y divide-white/5">
+                          {results.gaps.map((gap: any, i: number) => {
+                            // gaps may be objects {type, severity, message} or legacy strings
+                            const msg        = typeof gap === 'string' ? gap : gap.message ?? '';
+                            const gapType    = typeof gap === 'object' ? gap.type ?? '' : '';
+                            const severity   = typeof gap === 'object' ? gap.severity : null;
+                            const icon       = severity === 'CRITICAL' || gapType === 'LINKAGE_GAP' ? '🔴'
+                                             : severity === 'HIGH'     || gapType === 'ISWC_GAP'    ? '🟠'
+                                             : '🟡';
+                            const actionHref = gapType === 'LINKAGE_GAP' ? '/cwr-generator'
+                                             : gapType === 'ISWC_GAP'    ? '/cwr-generator'
+                                             : gapType === 'PERCENTAGE_GAP' ? '/split-verification'
+                                             : '/free-audit';
+                            const actionLabel= gapType === 'LINKAGE_GAP' ? 'Register ISRC'
+                                             : gapType === 'ISWC_GAP'    ? 'Link via CWR'
+                                             : gapType === 'PERCENTAGE_GAP' ? 'Verify Splits'
+                                             : 'Run Audit';
+                            return (
+                              <div key={i} className="flex items-center justify-between px-4 py-3">
+                                <div className="flex items-start gap-3">
+                                  <span className="text-base mt-0.5">{icon}</span>
+                                  <div>
+                                    {severity && (
+                                      <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 mr-2">{severity}</span>
+                                    )}
+                                    <p className="text-sm text-slate-300">{msg}</p>
+                                  </div>
+                                </div>
+                                <Link href={actionHref} className="flex-shrink-0 ml-3 px-3 py-1 bg-indigo-700/60 hover:bg-indigo-700 text-white text-[10px] font-black rounded-lg transition">
+                                  {actionLabel} →
+                                </Link>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    {results.gaps?.length === 0 && (
+                      <div className="p-4 bg-green-900/20 border border-green-500/30 rounded-xl flex items-center gap-3">
+                        <span className="text-2xl">✅</span>
+                        <p className="text-sm text-green-300 font-medium">No gaps detected — this recording is fully indexed across MusicBrainz, ListenBrainz, and TheAudioDB.</p>
+                      </div>
+                    )}
+
+                    {/* ACRCloud Enrichment Panel */}
+                    {acrData && (
+                      <div className="border border-indigo-500/30 rounded-xl overflow-hidden">
+                        <div className="px-4 py-2 bg-indigo-900/20 border-b border-indigo-500/20 flex items-center gap-2">
+                          <span className="text-indigo-300 text-sm font-black">🎵 ACRCloud DATA</span>
+                          {acrData.album?.label && (
+                            <span className="text-xs text-slate-400">Label: {acrData.album.label}</span>
+                          )}
+                        </div>
+                        <div className="p-4 space-y-3">
+                          {/* Album cover + basic info */}
+                          <div className="flex items-start gap-3">
+                            {acrData.album?.cover && (
+                              <img src={acrData.album.cover} alt="cover" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+                            )}
+                            <div className="min-w-0">
+                              {acrData.works?.[0]?.iswc && (
+                                <p className="text-xs text-slate-300">
+                                  <span className="text-slate-500 font-bold uppercase text-[10px]">ISWC </span>
+                                  <span className="font-mono text-indigo-300">{acrData.works[0].iswc}</span>
+                                </p>
+                              )}
+                              {acrData.album?.upc && (
+                                <p className="text-xs text-slate-400 mt-0.5">
+                                  <span className="text-slate-500 font-bold uppercase text-[10px]">UPC </span>
+                                  <span className="font-mono">{acrData.album.upc}</span>
+                                </p>
+                              )}
+                              {acrData.release_date && (
+                                <p className="text-xs text-slate-500 mt-0.5">Released: {acrData.release_date}</p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Contributors / Writers */}
+                          {acrData.works?.[0]?.contributors?.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">Writers / Contributors</p>
+                              <div className="space-y-1">
+                                {acrData.works[0].contributors.map((c: any, i: number) => (
+                                  <div key={i} className="flex items-center justify-between px-3 py-1.5 bg-white/5 rounded-lg">
+                                    <div>
+                                      <span className="text-xs font-medium text-slate-200">{c.name}</span>
+                                      {c.roles?.length > 0 && (
+                                        <span className="text-[10px] text-slate-500 ml-2">{c.roles.join(', ')}</span>
+                                      )}
+                                    </div>
+                                    {c.ipi ? (
+                                      <span className="text-[10px] font-mono text-green-400">IPI: {c.ipi}</span>
+                                    ) : (
+                                      <span className="text-[10px] text-orange-400">No IPI</span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Platform links */}
+                          {Object.values(acrData.platforms ?? {}).some(Boolean) && (
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">Platforms</p>
+                              <div className="flex flex-wrap gap-2">
+                                {acrData.platforms.spotify && (
+                                  <a href={acrData.platforms.spotify} target="_blank" rel="noreferrer" className="px-3 py-1 bg-green-800/40 hover:bg-green-700/50 text-green-300 text-[10px] font-bold rounded-lg border border-green-600/30 transition">Spotify ↗</a>
+                                )}
+                                {acrData.platforms.applemusic && (
+                                  <a href={acrData.platforms.applemusic} target="_blank" rel="noreferrer" className="px-3 py-1 bg-pink-900/40 hover:bg-pink-800/50 text-pink-300 text-[10px] font-bold rounded-lg border border-pink-600/30 transition">Apple Music ↗</a>
+                                )}
+                                {acrData.platforms.youtube && (
+                                  <a href={acrData.platforms.youtube} target="_blank" rel="noreferrer" className="px-3 py-1 bg-red-900/40 hover:bg-red-800/50 text-red-300 text-[10px] font-bold rounded-lg border border-red-600/30 transition">YouTube ↗</a>
+                                )}
+                                {acrData.platforms.deezer && (
+                                  <a href={acrData.platforms.deezer} target="_blank" rel="noreferrer" className="px-3 py-1 bg-slate-700/60 hover:bg-slate-600/60 text-slate-300 text-[10px] font-bold rounded-lg border border-slate-500/30 transition">Deezer ↗</a>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Action buttons */}
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      <Link href={`/mlc-search`} className="px-3 py-1.5 bg-indigo-700 hover:bg-indigo-600 text-white text-xs font-bold rounded-lg transition">🔎 Check MLC</Link>
+                      <Link href="/cwr-generator" className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-indigo-300 text-xs font-bold rounded-lg border border-indigo-500/30 transition">📋 CWR Registration</Link>
+                      <Link href={`/free-audit?isrc=${results.isrc}`} className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-slate-300 text-xs font-bold rounded-lg border border-white/10 transition">🔬 Full Forensic Audit</Link>
+                      {results.audiodb?.music_video && (
+                        <a href={results.audiodb.music_video} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-red-700/60 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition">🎬 Music Video</a>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
         )}
 
-        {/* Feature Cards */}
+        {/* Feature Cards - All black text */}
         <div className="grid md:grid-cols-3 gap-6 mt-12">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition">
+          <div className="bg-[#0f172a] p-6 rounded-xl shadow-sm border border-white/10">
             <div className="text-3xl mb-3">🔍</div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Global PRO Coverage</h3>
-            <p className="text-gray-700">
-              Scans MusicBrainz + direct links to ASCAP, BMI, SOCAN, PRS.
+            <h3 className="text-lg font-semibold text-white mb-2">Global PRO Coverage</h3>
+            <p className="text-slate-300">
+              Scans SMPT + direct links to ASCAP, BMI, SOCAN, PRS — find unclaimed from viral TikToks to radio spins.
             </p>
           </div>
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition">
+          <div className="bg-[#0f172a] p-6 rounded-xl shadow-sm border border-white/10">
             <div className="text-3xl mb-3">🎫</div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Smart ISRC Resolution</h3>
-            <p className="text-gray-700">
-              Finds matches even when ISRC isn't in MusicBrainz.
+            <h3 className="text-lg font-semibold text-white mb-2">Real ISRC Data</h3>
+            <p className="text-slate-300">
+              Pull real ISRCs from SMPT to verify neighboring rights and SoundExchange claims.
             </p>
           </div>
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition">
-            <div className="text-3xl mb-3">💾</div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Self-Learning Database</h3>
-            <p className="text-gray-700">
-              Your confirmations make future searches faster.
+          <div className="bg-[#0f172a] p-6 rounded-xl shadow-sm border border-white/10">
+            <div className="text-3xl mb-3">💰</div>
+            <h3 className="text-lg font-semibold text-white mb-2">Claim Your Bag</h3>
+            <p className="text-slate-300">
+              Direct links to every PRO and rights org — no more guessing where to go.
             </p>
           </div>
         </div>
       </div>
-
-      {/* Confirmation Modal */}
-      {pendingMapping && (
-        <ISRCConfirmationModal
-          isOpen={showConfirmation}
-          onClose={() => {
-            setShowConfirmation(false);
-            setPendingMapping(null);
-          }}
-          onConfirm={handleConfirmMapping}
-          originalIsrc={pendingMapping.originalIsrc}
-          suggestedTrack={pendingMapping.suggestedTrack}
-        />
-      )}
     </div>
   );
 }

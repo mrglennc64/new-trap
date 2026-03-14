@@ -1,13 +1,9 @@
-﻿// app/verify-splits/page.tsx
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import Link from 'next/link'
-import * as XLSX from 'xlsx'
-import { jsPDF } from 'jspdf'
-import html2canvas from 'html2canvas'
+import { useDemoMode } from '../lib/DemoModeProvider'
 
-// Types
+// ── Types ──────────────────────────────────────────────────────
 interface Contributor {
   name: string
   role: string
@@ -15,8 +11,17 @@ interface Contributor {
   ipi: string
 }
 
-interface Error {
+interface ValidationError {
   message: string
+}
+
+interface FixSuggestion {
+  id: string
+  issue: string
+  suggestion: string
+  status: 'pending' | 'accepted' | 'skipped'
+  type: 'fill_name' | 'fill_ipi' | 'normalize_splits'
+  contributorIndex?: number
 }
 
 interface PaymentDistribution {
@@ -29,345 +34,397 @@ interface PaymentDistribution {
 
 type Step = 1 | 2 | 3 | 4
 
-export default function VerifySplitsPage() {
-  // State Management
-  const [currentData, setCurrentData] = useState<Contributor[]>([])
-  const [errors, setErrors] = useState<Error[]>([])
-  const [currentStep, setCurrentStep] = useState<Step>(1)
-  const [grossAmount, setGrossAmount] = useState<number>(50000)
-  const [showTechDetails, setShowTechDetails] = useState<boolean>(false)
-  const [isLoading, setIsLoading] = useState<boolean>(false)
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error'; visible: boolean }>({
-    message: '',
-    type: 'success',
-    visible: false
+// Georgia state income tax withholding — O.C.G.A. § 48-7-26
+const TAX_RATE  = 0.0549
+const TAX_LABEL = 'Georgia State Tax Withholding (5.49%)'
+
+// ── Helpers ────────────────────────────────────────────────────
+const G  = '#2B6F4B'
+const GH = '#1f5236'
+
+const PERFECT_SAMPLE: Contributor[] = [
+  { name: 'Marcus Johnson', role: 'Composer', percentage: 50, ipi: '00624789341' },
+  { name: 'Deja Williams',  role: 'Lyricist',  percentage: 30, ipi: '00472915682' },
+  { name: 'Troy Bennett',   role: 'Producer',  percentage: 20, ipi: '00836125497' },
+]
+
+const ERROR_SAMPLE: Contributor[] = [
+  { name: 'Marcus Johnson', role: 'Composer', percentage: 60, ipi: '' },
+  { name: '',               role: 'Lyricist',  percentage: 25, ipi: '00472915682' },
+  { name: 'Troy Bennett',   role: 'Producer',  percentage: 20, ipi: 'invalid' },
+  { name: 'Extra Writer',   role: 'Writer',    percentage: 10, ipi: '' },
+]
+
+function validateData(data: Contributor[]): ValidationError[] {
+  const errs: ValidationError[] = []
+  let total = 0
+  data.forEach((item, i) => {
+    total += item.percentage || 0
+    if (!item.name?.trim())
+      errs.push({ message: `Contributor ${i + 1} missing name` })
+    if (!item.ipi?.trim() || item.ipi === 'invalid')
+      errs.push({ message: `${item.name || `Contributor ${i + 1}`} missing IPI/ISWC` })
+    if (item.percentage <= 0 || item.percentage > 100)
+      errs.push({ message: `${item.name || `Contributor ${i + 1}`} has invalid percentage: ${item.percentage}%` })
   })
-  const [verificationId, setVerificationId] = useState<string>('QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco')
-  const [timestamp, setTimestamp] = useState<string>('')
+  if (Math.abs(total - 100) > 0.1)
+    errs.push({ message: `Total split is ${total}%, must equal 100%` })
+  return errs
+}
 
-  // Constants
-  const TAX_RATE = 0.25 // 25% Swedish tax withholding
+function buildFixes(data: Contributor[]): FixSuggestion[] {
+  const fixes: FixSuggestion[] = []
+  data.forEach((item, i) => {
+    if (!item.name?.trim()) {
+      fixes.push({
+        id: `name_${i}`,
+        issue: `Contributor ${i + 1} is missing a name`,
+        suggestion: `Assign a Legal Identity Hold — prevents invalid SoundExchange filing with unnamed contributor`,
+        status: 'pending',
+        type: 'fill_name',
+        contributorIndex: i,
+      })
+    }
+    if (!item.ipi?.trim() || item.ipi === 'invalid') {
+      fixes.push({
+        id: `ipi_${i}`,
+        issue: `${item.name || `Contributor ${i + 1}`} is missing a valid IPI/ISWC`,
+        suggestion: `Search MusicBrainz IPI registry to assign a verified IPI — "AUTO-IPI" placeholders are rejected by SoundExchange`,
+        status: 'pending',
+        type: 'fill_ipi',
+        contributorIndex: i,
+      })
+    }
+  })
+  const total = data.reduce((s, x) => s + (x.percentage || 0), 0)
+  if (Math.abs(total - 100) > 0.1) {
+    fixes.push({
+      id: 'normalize_splits',
+      issue: `Total split is ${total.toFixed(1)}%, must equal 100%`,
+      suggestion: `Proportional rescale — each contributor's share stays in ratio, but all percentages are adjusted to sum to exactly 100%`,
+      status: 'pending',
+      type: 'normalize_splits',
+    })
+  }
+  return fixes
+}
 
-  // Sample data
-  const PERFECT_SAMPLE: Contributor[] = [
-    { name: "Drik Svensson", role: "Composer", percentage: 50, ipi: "00624789341" },
-    { name: "Anna Deng", role: "Lyricist", percentage: 30, ipi: "00472915682" },
-    { name: "Lars Johansson", role: "Producer", percentage: 20, ipi: "00836125497" }
-  ]
+// ── Page ───────────────────────────────────────────────────────
+export default function VerifySplitsPage() {
+  const { demoMode } = useDemoMode()
+  const [currentData,     setCurrentData]     = useState<Contributor[]>([])
+  const [errors,          setErrors]          = useState<ValidationError[]>([])
+  const [currentStep,     setCurrentStep]     = useState<Step>(1)
+  const [grossAmount,     setGrossAmount]     = useState<number>(50000)
+  const [showTechDetails, setShowTechDetails] = useState(false)
+  const [isLoading,       setIsLoading]       = useState(false)
+  const [isDragging,      setIsDragging]      = useState(false)
+  const [showFixPanel,    setShowFixPanel]    = useState(false)
+  const [fixes,           setFixes]           = useState<FixSuggestion[]>([])
+  const [ipiSearch,       setIpiSearch]       = useState<Record<string, { loading: boolean; results: { name: string; ipi: string; pro: string }[]; error?: string }>>({})
+  const [nameChoice,      setNameChoice]      = useState<Record<string, string>>({})
+  const [rescalePreview,  setRescalePreview]  = useState<{ fixId: string; rows: { name: string; original: number; rescaled: number; change: number }[] } | null>(null)
+  const [verificationId,  setVerificationId]  = useState('QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco')
+  const [timestamp,       setTimestamp]       = useState('')
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error'; visible: boolean }>({
+    message: '', type: 'success', visible: false,
+  })
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const ERROR_SAMPLE: Contributor[] = [
-    { name: "Drik Svensson", role: "Composer", percentage: 60, ipi: "" },
-    { name: "", role: "Lyricist", percentage: 25, ipi: "00472915682" },
-    { name: "Lars Johansson", role: "Producer", percentage: 20, ipi: "invalid" },
-    { name: "Extra", role: "Writer", percentage: 10, ipi: "" }
-  ]
-
-  // Initialize timestamp on mount
   useEffect(() => {
     const now = new Date()
     setTimestamp(now.toISOString().replace('T', ' ').substring(0, 16) + ' UTC')
   }, [])
 
-  // Helper Functions
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type, visible: true })
     setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000)
   }
 
-  const updateStep = (step: Step) => {
-    setCurrentStep(step)
-  }
-
   const progressWidth = `${((currentStep - 1) / 3) * 100}%`
 
-  // Data Validation
-  const validateData = (data: Contributor[]): Error[] => {
-    const errors: Error[] = []
-    let total = 0
-
-    data.forEach((item, index) => {
-      total += item.percentage || 0
-
-      if (!item.name || item.name.trim() === '') {
-        errors.push({ message: `Contributor ${index + 1} missing name` })
-      }
-
-      if (!item.ipi || item.ipi.trim() === '') {
-        errors.push({ message: `${item.name || 'Contributor'} missing IPI/ISWC` })
-      }
-
-      if (item.percentage <= 0 || item.percentage > 100) {
-        errors.push({ message: `${item.name || 'Contributor'} has invalid percentage: ${item.percentage}%` })
-      }
-    })
-
-    if (Math.abs(total - 100) > 0.1) {
-      errors.push({ message: `Total split is ${total}%, must equal 100%` })
-    }
-
-    return errors
+  // ── Data processing ──────────────────────────────────────────
+  const processData = (data: Contributor[]) => {
+    setCurrentData(data)
+    setShowFixPanel(false)
+    setFixes([])
+    const errs = validateData(data)
+    setErrors(errs)
+    setCurrentStep(errs.length > 0 ? 2 : 3)
   }
 
-  // File Handling
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
     if (!file) return
-
-    // Simulate file parsing
     setIsLoading(true)
     setTimeout(() => {
-      // Randomly choose between perfect and error sample for demo
-      const random = Math.random()
-      if (random > 0.5) {
-        processData(PERFECT_SAMPLE)
-      } else {
-        processData(ERROR_SAMPLE)
-      }
+      processData(Math.random() > 0.5 ? PERFECT_SAMPLE : ERROR_SAMPLE)
       showToast(`Loaded: ${file.name}`)
       setIsLoading(false)
     }, 500)
   }
 
-  const processData = (data: Contributor[]) => {
-    setCurrentData(data)
+  // Demo mode: auto-load perfect sample when active
+  useEffect(() => {
+    if (demoMode && currentData.length === 0) processData(PERFECT_SAMPLE)
+  }, [demoMode])
 
-    // Validate
-    const validationErrors = validateData(data)
-    setErrors(validationErrors)
+  const loadPerfectSample = () => { processData(PERFECT_SAMPLE); showToast('Perfect sample loaded — no issues detected') }
+  const loadErrorSample   = () => { processData(ERROR_SAMPLE);   showToast('Sample with issues loaded', 'error') }
 
-    if (validationErrors.length > 0) {
-      updateStep(2) // Issues Detected
-    } else {
-      updateStep(3) // Data Verified
-    }
+  // ── Inline editing ───────────────────────────────────────────
+  const startManually = () => {
+    const blank: Contributor[] = [{ name: '', role: 'Composer', percentage: 0, ipi: '' }]
+    setCurrentData(blank)
+    setErrors(validateData(blank))
+    setCurrentStep(2)
+    setShowFixPanel(false)
+    setFixes([])
   }
 
-  const loadPerfectSample = () => {
-    processData(PERFECT_SAMPLE)
-    showToast('Perfect sample loaded - no issues detected')
-  }
-
-  const loadErrorSample = () => {
-    processData(ERROR_SAMPLE)
-    showToast('Sample with issues loaded', 'error')
-  }
-
-  const autoFixErrors = () => {
-    const fixedData = [...currentData]
-
-    // Fix missing names and IPIs
-    fixedData.forEach((item, i) => {
-      if (!item.name || item.name === '') item.name = `Contributor ${i + 1}`
-      if (!item.ipi || item.ipi === 'invalid') item.ipi = 'Auto-generated'
+  const updateContributor = (index: number, field: keyof Contributor, value: string | number) => {
+    setCurrentData(prev => {
+      const updated = prev.map((c, i) => i === index ? { ...c, [field]: value } : c)
+      const errs = validateData(updated)
+      setErrors(errs)
+      if (errs.length === 0) setCurrentStep(3)
+      return updated
     })
+  }
 
-    // Fix total percentage
-    const total = fixedData.reduce((sum, item) => sum + item.percentage, 0)
-    if (Math.abs(total - 100) > 0.1) {
-      const factor = 100 / total
-      fixedData.forEach(item => {
-        item.percentage = Math.round(item.percentage * factor * 10) / 10
-      })
-    }
+  const addContributor = () => {
+    setCurrentData(prev => {
+      const updated = [...prev, { name: '', role: 'Composer', percentage: 0, ipi: '' }]
+      setErrors(validateData(updated))
+      return updated
+    })
+  }
 
-    const validationErrors = validateData(fixedData)
-    setErrors(validationErrors)
-    setCurrentData(fixedData)
+  const removeContributor = (index: number) => {
+    setCurrentData(prev => {
+      const updated = prev.filter((_, i) => i !== index)
+      setErrors(validateData(updated))
+      if (updated.length === 0) setCurrentStep(1)
+      return updated
+    })
+  }
 
-    if (validationErrors.length === 0) {
-      showToast('✅ All issues fixed automatically')
-    } else {
-      showToast('⚠️ Some issues could not be auto-fixed', 'error')
+  // ── Show fix suggestions ─────────────────────────────────────
+  const handleShowFixes = () => {
+    if (!showFixPanel) setFixes(buildFixes(currentData))
+    setShowFixPanel(v => !v)
+  }
+
+  // ── IPI: search MusicBrainz for real IPI ─────────────────────
+  const searchIPI = async (fixId: string, contributorName: string) => {
+    if (!contributorName.trim()) return
+    setIpiSearch(prev => ({ ...prev, [fixId]: { loading: true, results: [] } }))
+    try {
+      const res = await fetch(
+        `https://musicbrainz.org/ws/2/artist/?query=name:${encodeURIComponent(contributorName)}&fmt=json&limit=8`,
+        { headers: { 'User-Agent': 'TrapRoyaltiesPro/1.0 (traproyaltiespro.com)' } }
+      )
+      const data = await res.json()
+      const results = (data.artists || [])
+        .filter((a: any) => a.ipis?.length > 0)
+        .slice(0, 5)
+        .map((a: any) => ({
+          name: a.name,
+          ipi: a.ipis[0],
+          pro: [a.type, a.disambiguation].filter(Boolean).join(' · '),
+        }))
+      setIpiSearch(prev => ({
+        ...prev,
+        [fixId]: {
+          loading: false,
+          results,
+          error: results.length === 0 ? 'No IPI records found in MusicBrainz for this name — register at your PRO directly' : undefined,
+        },
+      }))
+    } catch {
+      setIpiSearch(prev => ({ ...prev, [fixId]: { loading: false, results: [], error: 'MusicBrainz search failed — check network' } }))
     }
   }
 
-  const startVerification = () => {
-    if (errors.length > 0) {
-      showToast('Please fix issues before verification', 'error')
-      return
-    }
+  const assignIPI = (fixId: string, ipi: string) => {
+    const fix = fixes.find(f => f.id === fixId)!
+    setFixes(prev => prev.map(f => f.id === fixId ? { ...f, status: 'accepted' } : f))
+    setCurrentData(prev => {
+      const updated = prev.map(x => ({ ...x }))
+      if (fix.contributorIndex !== undefined) updated[fix.contributorIndex].ipi = ipi
+      return updated
+    })
+  }
 
-    // Generate new verification ID
-    const newHash = 'QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco' + Math.random().toString(36).substring(2, 8)
-    setVerificationId(newHash)
-    
-    const now = new Date()
-    setTimestamp(now.toISOString().replace('T', ' ').substring(0, 16) + ' UTC')
-    
-    updateStep(3)
+  // ── Name: assign legal hold ───────────────────────────────────
+  const assignName = (fixId: string) => {
+    const fix = fixes.find(f => f.id === fixId)!
+    const choice = nameChoice[fixId] || 'TBA - Identity Audit in Progress'
+    setFixes(prev => prev.map(f => f.id === fixId ? { ...f, status: 'accepted' } : f))
+    setCurrentData(prev => {
+      const updated = prev.map(x => ({ ...x }))
+      if (fix.contributorIndex !== undefined) updated[fix.contributorIndex].name = choice
+      return updated
+    })
+  }
+
+  // ── Splits: preview then confirm rescale ──────────────────────
+  const buildRescalePreview = (fixId: string) => {
+    const total = currentData.reduce((s, x) => s + x.percentage, 0)
+    const scaleFactor = 100 / total
+    const rows = currentData.map(x => {
+      const rescaled = parseFloat((x.percentage * scaleFactor).toFixed(2))
+      return { name: x.name || '(unnamed)', original: x.percentage, rescaled, change: 0 }
+    })
+    // Fix rounding so total is exactly 100
+    const sum = rows.reduce((s, r) => s + r.rescaled, 0)
+    if (Math.abs(sum - 100) > 0.001) {
+      rows[0].rescaled = parseFloat((rows[0].rescaled + (100 - sum)).toFixed(2))
+    }
+    rows.forEach(r => { r.change = parseFloat((r.rescaled - r.original).toFixed(2)) })
+    setRescalePreview({ fixId, rows })
+  }
+
+  const confirmRescale = () => {
+    if (!rescalePreview) return
+    setFixes(prev => prev.map(f => f.id === rescalePreview.fixId ? { ...f, status: 'accepted' } : f))
+    setCurrentData(prev =>
+      prev.map((x, i) => ({ ...x, percentage: rescalePreview.rows[i]?.rescaled ?? x.percentage }))
+    )
+    setRescalePreview(null)
+    showToast('Splits rescaled — all contributors must re-verify adjusted percentages', 'error')
+  }
+
+  // ── Skip ──────────────────────────────────────────────────────
+  const skipFix = (fixId: string) => {
+    setFixes(prev => prev.map(f => f.id === fixId ? { ...f, status: 'skipped' } : f))
+  }
+
+  // Re-validate after fixes change
+  useEffect(() => {
+    if (fixes.length === 0) return
+    const allResolved = fixes.every(f => f.status !== 'pending')
+    if (!allResolved) return
+    // All fixes answered — re-validate with latest data
+    setCurrentData(prev => {
+      const errs = validateData(prev)
+      setErrors(errs)
+      if (errs.length === 0) {
+        setCurrentStep(3)
+        showToast('All issues resolved — data verified!')
+        setShowFixPanel(false)
+      } else {
+        showToast(`${errs.length} issue(s) remain after skipped fixes`, 'error')
+      }
+      return prev
+    })
+  }, [fixes])
+
+  // ── Verification ─────────────────────────────────────────────
+  const startVerification = () => {
+    if (errors.length > 0) { showToast('Please fix issues before verification', 'error'); return }
+    setVerificationId('QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco' + Math.random().toString(36).substring(2, 8))
+    setTimestamp(new Date().toISOString().replace('T', ' ').substring(0, 16) + ' UTC')
+    setCurrentStep(3)
     showToast('Data verified successfully')
   }
 
-  // Payment Calculations
-  const updatePaymentCalculation = (amount: number) => {
-    setGrossAmount(amount)
-  }
+  const calculateAndShowPayment = () => { setCurrentStep(4); showToast('Payment calculated successfully') }
 
-  const calculateAndShowPayment = () => {
-    updateStep(4)
-    showToast('Payment calculated successfully')
-  }
-
-  const getDistribution = (): PaymentDistribution[] => {
-    return currentData.map(item => {
+  const getDistribution = (): PaymentDistribution[] =>
+    currentData.map(item => {
       const grossShare = grossAmount * (item.percentage / 100)
-      const taxShare = grossShare * TAX_RATE
-      const netShare = grossShare - taxShare
-
-      return {
-        name: item.name,
-        percentage: item.percentage,
-        grossShare,
-        taxShare,
-        netShare
-      }
+      const taxShare   = grossShare * TAX_RATE
+      return { name: item.name, percentage: item.percentage, grossShare, taxShare, netShare: grossShare - taxShare }
     })
-  }
 
   const taxAmount = grossAmount * TAX_RATE
   const netAmount = grossAmount - taxAmount
 
-  // PDF Download
+  // ── PDF ──────────────────────────────────────────────────────
   const downloadPaymentPDF = async () => {
-    if (!currentData || currentData.length === 0) {
-      showToast('No data to export', 'error')
-      return
-    }
-
+    if (!currentData.length) { showToast('No data to export', 'error'); return }
     setIsLoading(true)
-
     try {
-      // Store data for PDF generation
-      localStorage.setItem('trapRoyaltiesReportData', JSON.stringify(currentData))
-      localStorage.setItem('trapRoyaltiesFileName', 'SplitSheet_Mar2026.pdf')
-      localStorage.setItem('trapRoyaltiesDocumentHash', verificationId)
+      localStorage.setItem('trapRoyaltiesReportData',      JSON.stringify(currentData))
+      localStorage.setItem('trapRoyaltiesFileName',        'SplitSheet_TRP.pdf')
+      localStorage.setItem('trapRoyaltiesDocumentHash',    verificationId)
       localStorage.setItem('trapRoyaltiesReportTimestamp', timestamp)
-      localStorage.setItem('trapRoyaltiesGrossAmount', grossAmount.toString())
-      localStorage.setItem('trapRoyaltiesTaxRate', TAX_RATE.toString())
-
-      // Open PDF in new tab
+      localStorage.setItem('trapRoyaltiesGrossAmount',     grossAmount.toString())
+      localStorage.setItem('trapRoyaltiesTaxRate',         TAX_RATE.toString())
       window.open('/pdf-report', '_blank')
       showToast('Opening PDF report...')
-    } catch (error) {
-      showToast('Error generating PDF', 'error')
-    } finally {
-      setIsLoading(false)
-    }
+    } catch { showToast('Error generating PDF', 'error') }
+    finally { setIsLoading(false) }
   }
 
   const resetWorkflow = () => {
-    setCurrentData([])
-    setErrors([])
-    setCurrentStep(1)
-    setGrossAmount(50000)
+    setCurrentData([]); setErrors([]); setCurrentStep(1)
+    setGrossAmount(50000); setShowFixPanel(false); setFixes([])
     showToast('Workflow reset')
   }
 
-  // Drag and drop handlers
-  const [isDragging, setIsDragging] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(true)
-  }
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(false)
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(false)
-    const file = e.dataTransfer.files[0]
-    if (file && fileInputRef.current) {
-      const event = { target: { files: [file] } } as unknown as React.ChangeEvent<HTMLInputElement>
-      handleFileSelect(event)
-    }
-  }
-
+  // ── Render ───────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-[#1A202C] font-['Inter',_sans-serif]">
-      {/* Loading Overlay */}
+    <div className="min-h-screen font-['Inter',_sans-serif]" style={{ background: '#F8FAFC', color: '#1A202C' }}>
+
+      {/* Loading */}
       {isLoading && (
-        <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-[10000]">
-          <div className="bg-white p-8 rounded-xl text-center">
-            <i className="fas fa-spinner fa-pulse text-4xl text-[#2B6F4B]"></i>
-            <p className="mt-4 font-medium">Generating PDF...</p>
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[10000]">
+          <div className="bg-white p-8 rounded-xl text-center shadow-2xl">
+            <div className="w-10 h-10 border-4 border-[#2B6F4B] border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <p className="mt-4 font-medium">Processing...</p>
           </div>
         </div>
       )}
 
       {/* Toast */}
       {toast.visible && (
-        <div 
-          className={`fixed bottom-8 right-8 bg-white border-l-4 ${
-            toast.type === 'success' ? 'border-[#2B6F4B]' : 'border-[#C53030]'
-          } rounded-lg p-4 shadow-xl z-[9999] transition-transform duration-300 translate-x-0`}
-        >
+        <div className={`fixed bottom-8 right-8 bg-white border-l-4 ${toast.type === 'success' ? 'border-[#2B6F4B]' : 'border-[#C53030]'} rounded-lg p-4 shadow-xl z-[9999]`}>
           <div className="flex items-center gap-3">
             <i className={`fas fa-check-circle ${toast.type === 'success' ? 'text-[#2B6F4B]' : 'text-[#C53030]'}`}></i>
-            <span>{toast.message}</span>
+            <span className="text-sm font-medium">{toast.message}</span>
           </div>
         </div>
       )}
 
       <div className="max-w-7xl mx-auto px-6">
-        {/* Navigation */}
-        <nav className="flex justify-between items-center py-5 border-b border-gray-200 flex-wrap gap-5">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.location.href = '/'}>
-            <div className="w-9 h-9 bg-indigo-900 rounded-lg flex items-center justify-center text-white text-xl font-semibold">
-              TP
-            </div>
-            <span className="text-[22px] font-semibold text-indigo-900">TrapRoyalties<span className="text-indigo-600">Pro</span></span>
-          </div>
-          <div className="flex gap-8 items-center">
-            <Link href="/" className="text-gray-600 hover:text-indigo-900 font-medium text-sm">Home</Link>
-            <Link href="/for-attorneys" className="text-gray-600 hover:text-indigo-900 font-medium text-sm">For Attorneys</Link>
-            <Link href="/verify-splits" className="text-indigo-900 font-medium text-sm border-b-2 border-indigo-900 pb-1">Split Verification</Link>
-            <Link href="/free-audit" className="text-gray-600 hover:text-indigo-900 font-medium text-sm">Free Audit</Link>
-            <Link href="/pilot" className="text-gray-600 hover:text-indigo-900 font-medium text-sm">Pilot</Link>
-          </div>
-          <button className="bg-transparent border border-gray-200 px-5 py-2 rounded-full font-medium hover:border-indigo-900 hover:text-indigo-900 transition">
-            <i className="far fa-envelope mr-2"></i> Contact
-          </button>
-        </nav>
 
-        {/* Page Header */}
+        {/* Header */}
         <div className="text-center py-10 max-w-2xl mx-auto">
-          <h1 className="text-4xl font-bold text-indigo-900 mb-3">Split Verification & Payment Workflow</h1>
-          <p className="text-gray-600 text-lg">Upload → Detect issues → Verify → Enter amount → Calculate payment → Download PDF</p>
+          <h1 className="text-4xl font-bold mb-3" style={{ color: G }}>Split Verification & Payment</h1>
+          <p className="text-[#4A5568] text-lg">Upload → Detect issues → Verify → Calculate payment → Download PDF</p>
+          <p className="text-xs text-[#4A5568] mt-2">Georgia Law Compliant · O.C.G.A. § 48-7-26</p>
         </div>
 
-        {/* Before vs After Banner */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white border border-gray-200 rounded-2xl p-6 mb-8 shadow-sm">
-          <div className="md:border-r-2 border-red-100 pr-6">
-            <h3 className="text-xl text-red-600 mb-4 flex items-center gap-2">
-              <i className="fas fa-times-circle"></i> Before TrapRoyaltiesPro
+        {/* Before / After */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white border border-[#E2E8F0] rounded-2xl p-6 mb-8 shadow-sm">
+          <div className="md:border-r border-[#E2E8F0] pr-6">
+            <h3 className="text-lg font-semibold text-[#C53030] mb-4 flex items-center gap-2">
+              <i className="fas fa-times-circle"></i> Without TrapRoyaltiesPro
             </h3>
             <div className="flex items-center gap-3 flex-wrap text-sm">
-              <span className="bg-gray-100 px-4 py-2 rounded-full border border-gray-200">Label</span>
-              <i className="fas fa-arrow-right text-gray-300"></i>
-              <span className="bg-red-100 text-red-600 px-4 py-2 rounded-full border border-red-200">Split Issues</span>
-              <i className="fas fa-arrow-right text-gray-300"></i>
-              <span className="bg-gray-100 px-4 py-2 rounded-full border border-gray-200">PRO</span>
-              <i className="fas fa-arrow-right text-gray-300"></i>
-              <span className="bg-gray-100 px-4 py-2 rounded-full border border-gray-200">Payment Dispute</span>
+              <span className="bg-[#F1F5F9] px-4 py-2 rounded-full border border-[#E2E8F0] text-[#4A5568]">Label</span>
+              <i className="fas fa-arrow-right text-[#CBD5E0]"></i>
+              <span className="bg-red-50 text-[#C53030] px-4 py-2 rounded-full border border-red-200">Split Issues</span>
+              <i className="fas fa-arrow-right text-[#CBD5E0]"></i>
+              <span className="bg-[#F1F5F9] px-4 py-2 rounded-full border border-[#E2E8F0] text-[#4A5568]">PRO</span>
+              <i className="fas fa-arrow-right text-[#CBD5E0]"></i>
+              <span className="bg-[#F1F5F9] px-4 py-2 rounded-full border border-[#E2E8F0] text-[#4A5568]">Payment Dispute</span>
             </div>
           </div>
           <div>
-            <h3 className="text-xl text-indigo-900 mb-4 flex items-center gap-2">
-              <i className="fas fa-check-circle text-indigo-900"></i> With TrapRoyaltiesPro
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2" style={{ color: G }}>
+              <i className="fas fa-check-circle"></i> With TrapRoyaltiesPro
             </h3>
             <div className="flex items-center gap-3 flex-wrap text-sm">
-              <span className="bg-gray-100 px-4 py-2 rounded-full border border-gray-200">Label</span>
-              <i className="fas fa-arrow-right text-gray-300"></i>
-              <span className="bg-indigo-100 text-indigo-900 px-4 py-2 rounded-full border border-indigo-300">TrapRoyaltiesPro</span>
-              <i className="fas fa-arrow-right text-gray-300"></i>
-              <span className="bg-gray-100 px-4 py-2 rounded-full border border-gray-200">PRO</span>
-              <i className="fas fa-arrow-right text-gray-300"></i>
-              <span className="bg-gray-100 px-4 py-2 rounded-full border border-gray-200">Verified Payment</span>
+              <span className="bg-[#F1F5F9] px-4 py-2 rounded-full border border-[#E2E8F0] text-[#4A5568]">Label</span>
+              <i className="fas fa-arrow-right text-[#CBD5E0]"></i>
+              <span className="px-4 py-2 rounded-full border text-sm font-medium" style={{ background: '#DEF7E5', color: G, borderColor: '#9AE6B4' }}>TrapRoyaltiesPro</span>
+              <i className="fas fa-arrow-right text-[#CBD5E0]"></i>
+              <span className="bg-[#F1F5F9] px-4 py-2 rounded-full border border-[#E2E8F0] text-[#4A5568]">PRO</span>
+              <i className="fas fa-arrow-right text-[#CBD5E0]"></i>
+              <span className="px-4 py-2 rounded-full border text-sm" style={{ background: '#DEF7E5', color: G, borderColor: '#9AE6B4' }}>Verified Payment</span>
             </div>
           </div>
         </div>
@@ -375,259 +432,469 @@ export default function VerifySplitsPage() {
         {/* Progress Steps */}
         <div className="mb-8">
           <div className="flex items-center justify-between max-w-2xl mx-auto relative">
-            {/* Progress line background */}
-            <div className="absolute top-5 left-12 right-12 h-1 bg-gray-200 z-0"></div>
-            
-            {/* Step 1 */}
-            <div className="flex flex-col items-center relative z-10 bg-[#F8FAFC] px-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold mb-2 transition-all ${
-                currentStep >= 1 
-                  ? 'bg-indigo-900 border-indigo-900 text-white' 
-                  : 'bg-white border-2 border-gray-200 text-gray-500'
-              }`}>
-                {currentStep > 1 ? <i className="fas fa-check"></i> : '1'}
+            <div className="absolute top-5 left-12 right-12 h-[3px] bg-[#E2E8F0] z-0"></div>
+            {([
+              { n: 1 as Step, label: 'Upload Data' },
+              { n: 2 as Step, label: 'Issues Detected' },
+              { n: 3 as Step, label: 'Data Verified' },
+              { n: 4 as Step, label: 'Payment Ready' },
+            ]).map(({ n, label }) => (
+              <div key={n} className="flex flex-col items-center relative z-10 px-3" style={{ background: '#F8FAFC' }}>
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold mb-2 transition-all border-2`}
+                  style={currentStep >= n
+                    ? { background: G, borderColor: G, color: '#fff' }
+                    : { background: '#fff', borderColor: '#E2E8F0', color: '#A0AEC0' }}
+                >
+                  {currentStep > n ? <i className="fas fa-check text-sm"></i> : n}
+                </div>
+                <span className="text-sm font-medium" style={currentStep >= n ? { color: G, fontWeight: 600 } : { color: '#A0AEC0' }}>
+                  {label}
+                </span>
               </div>
-              <span className={`text-sm font-medium ${currentStep >= 1 ? 'text-indigo-900 font-semibold' : 'text-gray-500'}`}>
-                Upload Data
-              </span>
-            </div>
-
-            {/* Step 2 */}
-            <div className="flex flex-col items-center relative z-10 bg-[#F8FAFC] px-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold mb-2 transition-all ${
-                currentStep >= 2 
-                  ? 'bg-indigo-900 border-indigo-900 text-white' 
-                  : 'bg-white border-2 border-gray-200 text-gray-500'
-              }`}>
-                {currentStep > 2 ? <i className="fas fa-check"></i> : '2'}
-              </div>
-              <span className={`text-sm font-medium ${currentStep >= 2 ? 'text-indigo-900 font-semibold' : 'text-gray-500'}`}>
-                Issues Detected
-              </span>
-            </div>
-
-            {/* Step 3 */}
-            <div className="flex flex-col items-center relative z-10 bg-[#F8FAFC] px-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold mb-2 transition-all ${
-                currentStep >= 3 
-                  ? 'bg-indigo-900 border-indigo-900 text-white' 
-                  : 'bg-white border-2 border-gray-200 text-gray-500'
-              }`}>
-                {currentStep > 3 ? <i className="fas fa-check"></i> : '3'}
-              </div>
-              <span className={`text-sm font-medium ${currentStep >= 3 ? 'text-indigo-900 font-semibold' : 'text-gray-500'}`}>
-                Data Verified
-              </span>
-            </div>
-
-            {/* Step 4 */}
-            <div className="flex flex-col items-center relative z-10 bg-[#F8FAFC] px-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold mb-2 transition-all ${
-                currentStep >= 4 
-                  ? 'bg-indigo-900 border-indigo-900 text-white' 
-                  : 'bg-white border-2 border-gray-200 text-gray-500'
-              }`}>
-                4
-              </div>
-              <span className={`text-sm font-medium ${currentStep >= 4 ? 'text-indigo-900 font-semibold' : 'text-gray-500'}`}>
-                Payment Ready
-              </span>
-            </div>
+            ))}
           </div>
-
-          {/* Green Progress Bar */}
-          <div className="max-w-2xl mx-auto mt-8 h-2 bg-gray-200 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-indigo-900 transition-all duration-500 rounded-full" 
-              style={{ width: progressWidth }}
-            ></div>
+          <div className="max-w-2xl mx-auto mt-6 h-2 bg-[#E2E8F0] rounded-full overflow-hidden">
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: progressWidth, background: G }}></div>
           </div>
         </div>
 
-        {/* Main Work Area */}
+        {/* Main Two-Panel */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 my-8">
-          {/* LEFT PANEL: UPLOAD + VALIDATE */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm">
-            <h2 className="text-xl font-semibold text-indigo-900 mb-6 flex items-center gap-2">
-              <i className="fas fa-cloud-upload-alt text-indigo-900"></i>
+
+          {/* LEFT: Upload + Validate */}
+          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-8 shadow-sm">
+            <h2 className="text-xl font-semibold mb-6 flex items-center gap-2" style={{ color: G }}>
+              <i className="fas fa-cloud-upload-alt"></i>
               Step 1: Upload split data
             </h2>
 
-            {/* Upload Area */}
-            <div 
-              className={`bg-gray-50 border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all ${
-                isDragging ? 'border-indigo-900 bg-indigo-50' : 'border-gray-200 hover:border-indigo-900 hover:bg-indigo-50'
-              }`}
+            {/* Drop zone */}
+            <div
+              className="border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all"
+              style={isDragging
+                ? { borderColor: G, background: '#DEF7E5' }
+                : { borderColor: '#CBD5E0', background: '#F8FAFC' }}
               onClick={() => fileInputRef.current?.click()}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
+              onDragOver={e => { e.preventDefault(); setIsDragging(true) }}
+              onDragLeave={e => { e.preventDefault(); setIsDragging(false) }}
+              onDrop={e => {
+                e.preventDefault(); setIsDragging(false)
+                const file = e.dataTransfer.files[0]
+                if (file) handleFileSelect({ target: { files: [file] } } as unknown as React.ChangeEvent<HTMLInputElement>)
+              }}
             >
-              <div className="text-5xl text-indigo-900 mb-4">
+              <div className="text-5xl mb-4" style={{ color: G }}>
                 <i className="fas fa-file-upload"></i>
               </div>
-              <h3 className="text-lg font-medium mb-2">Drop your split sheet here</h3>
-              <p className="text-gray-500 text-sm mb-4">CSV, Excel, or PDF</p>
-              <input 
-                type="file" 
-                ref={fileInputRef}
-                className="hidden" 
-                accept=".csv,.xlsx,.xls,.pdf"
-                onChange={handleFileSelect}
-              />
+              <h3 className="text-lg font-medium mb-2 text-[#1A202C]">Drop your split sheet here</h3>
+              <p className="text-[#4A5568] text-sm">CSV, Excel, or PDF</p>
+              <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.xlsx,.xls,.pdf" onChange={handleFileSelect} />
             </div>
 
-            {/* Sample Links */}
-            <div className="text-center my-4">
-              <button 
+            {/* Demo buttons */}
+            <div className="flex gap-3 my-4">
+              <button
                 onClick={loadPerfectSample}
-                className="text-indigo-900 text-sm mx-2 font-medium hover:underline"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 text-sm font-bold transition-all hover:shadow-md"
+                style={{ borderColor: G, color: G, background: '#F0FDF4' }}
               >
-                Load perfect sample
+                <span className="text-base">✅</span>
+                Load Perfect Sample
               </button>
-              <button 
+              <button
                 onClick={loadErrorSample}
-                className="text-red-600 text-sm mx-2 font-medium hover:underline"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-red-300 text-red-700 bg-red-50 text-sm font-bold transition-all hover:shadow-md hover:bg-red-100"
               >
-                Load test with errors
+                <span className="text-base">⚠️</span>
+                Load Test with Errors
               </button>
             </div>
+            <button
+              onClick={startManually}
+              className="w-full py-2.5 text-sm font-semibold rounded-xl border-2 border-dashed border-[#CBD5E0] text-[#4A5568] hover:border-[#2B6F4B] hover:text-[#2B6F4B] transition-all"
+            >
+              + Enter contributors manually
+            </button>
 
-            {/* Error Panel */}
+            {/* Error panel */}
             {errors.length > 0 && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-4 my-4">
-                <div className="flex items-center gap-2 text-red-600 font-semibold mb-3">
-                  <i className="fas fa-exclamation-triangle"></i>
-                  <span>Issues Detected</span>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2 text-[#C53030] font-semibold">
+                    <i className="fas fa-exclamation-triangle"></i>
+                    <span>{errors.length} Issue{errors.length > 1 ? 's' : ''} Detected</span>
+                  </div>
+                  <button
+                    onClick={handleShowFixes}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-full border border-[#C53030] text-[#C53030] hover:bg-red-100 transition"
+                  >
+                    {showFixPanel ? 'Hide Fix Suggestions' : 'Show Fix Suggestions'}
+                  </button>
                 </div>
-                <div className="text-red-800 text-sm mb-3">
-                  {errors.map((error, i) => (
-                    <div key={i}>• {error.message}</div>
+                <div className="text-[#C53030] text-sm space-y-1">
+                  {errors.map((err, i) => (
+                    <div key={i}>• {err.message}</div>
                   ))}
                 </div>
-                <button 
-                  onClick={autoFixErrors}
-                  className="bg-indigo-900 text-white px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 hover:bg-indigo-800 transition"
-                >
-                  <i className="fas fa-magic"></i>
-                  Auto-Fix Issues
-                </button>
+
+                {/* Fix suggestion cards */}
+                {showFixPanel && fixes.length > 0 && (
+                  <div className="mt-4 space-y-3">
+                    {fixes.map(fix => (
+                      <div
+                        key={fix.id}
+                        className="rounded-xl p-4 border"
+                        style={{
+                          background: '#1a1a2e',
+                          borderColor: fix.status === 'accepted' ? '#68D391' : fix.status === 'skipped' ? '#4A5568' : '#2d2d4e',
+                        }}
+                      >
+                        <div className="flex items-start gap-2 mb-2">
+                          <i className="fas fa-exclamation-circle text-[#C53030] text-xs mt-0.5 flex-shrink-0"></i>
+                          <span className="text-red-300 text-xs">{fix.issue}</span>
+                        </div>
+                        <div className="flex items-start gap-2 mb-3">
+                          <i className="fas fa-lightbulb text-xs mt-0.5 flex-shrink-0" style={{ color: '#68D391' }}></i>
+                          <span className="text-green-300 text-xs">{fix.suggestion}</span>
+                        </div>
+
+                        {fix.status === 'pending' && (
+                          <div>
+
+                            {/* ── IPI: MusicBrainz search ── */}
+                            {fix.type === 'fill_ipi' && (
+                              <div className="space-y-2">
+                                {!ipiSearch[fix.id] && (
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => searchIPI(fix.id, currentData[fix.contributorIndex!]?.name || '')}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-white transition"
+                                      style={{ background: '#3B5998' }}
+                                    >
+                                      <i className="fas fa-search"></i> Search MusicBrainz IPI
+                                    </button>
+                                    <button onClick={() => skipFix(fix.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-[#A0AEC0] border border-[#4A5568] hover:border-[#718096] transition" style={{ background: 'transparent' }}>
+                                      <i className="fas fa-times"></i> Skip
+                                    </button>
+                                  </div>
+                                )}
+                                {ipiSearch[fix.id]?.loading && (
+                                  <p className="text-xs text-slate-400 flex items-center gap-2">
+                                    <span className="inline-block w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></span>
+                                    Searching MusicBrainz IPI registry...
+                                  </p>
+                                )}
+                                {ipiSearch[fix.id]?.error && (
+                                  <div className="space-y-2">
+                                    <p className="text-xs text-orange-400">{ipiSearch[fix.id].error}</p>
+                                    <button onClick={() => skipFix(fix.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-[#A0AEC0] border border-[#4A5568] transition" style={{ background: 'transparent' }}>
+                                      <i className="fas fa-times"></i> Skip (register IPI manually)
+                                    </button>
+                                  </div>
+                                )}
+                                {(ipiSearch[fix.id]?.results?.length ?? 0) > 0 && (
+                                  <div className="space-y-1.5">
+                                    <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Select verified IPI from registry:</p>
+                                    {ipiSearch[fix.id].results.map((r, ri) => (
+                                      <div key={ri} className="flex items-center justify-between bg-slate-800 rounded-lg px-3 py-2">
+                                        <div>
+                                          <span className="text-xs text-white font-medium">{r.name}</span>
+                                          {r.pro && <span className="text-[10px] text-slate-400 ml-2">{r.pro}</span>}
+                                          <span className="text-[10px] font-mono text-indigo-300 ml-2">IPI: {r.ipi}</span>
+                                        </div>
+                                        <button
+                                          onClick={() => assignIPI(fix.id, r.ipi)}
+                                          className="text-[10px] px-2 py-1 rounded font-bold text-white transition"
+                                          style={{ background: G }}
+                                        >
+                                          Assign ✓
+                                        </button>
+                                      </div>
+                                    ))}
+                                    <button onClick={() => skipFix(fix.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-[#A0AEC0] border border-[#4A5568] transition mt-1" style={{ background: 'transparent' }}>
+                                      <i className="fas fa-times"></i> Skip
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* ── Name: legal hold options ── */}
+                            {fix.type === 'fill_name' && (
+                              <div className="space-y-2">
+                                <p className="text-[10px] text-orange-300 font-semibold">
+                                  ⚠️ IDENTITY RISK: {currentData[fix.contributorIndex!]?.percentage ?? 0}% of royalties will be frozen in the Black Box without a legal hold
+                                </p>
+                                <div className="space-y-1.5">
+                                  {[
+                                    { value: 'TBA - Identity Audit in Progress',    desc: 'Signals active search — SoundExchange holds share in escrow' },
+                                    { value: 'Anonymous (Work-for-Hire)',            desc: 'Only valid if a signed work-for-hire contract exists' },
+                                    { value: 'Disputed Identity - Escrow Requested', desc: 'Strongest hold — forces SoundExchange to collect & hold share' },
+                                  ].map(opt => {
+                                    const selected = (nameChoice[fix.id] ?? 'TBA - Identity Audit in Progress') === opt.value
+                                    return (
+                                      <label key={opt.value} className={`flex items-start gap-2.5 p-2.5 rounded-lg cursor-pointer border transition ${selected ? 'border-indigo-500/60 bg-indigo-900/20' : 'border-slate-700 bg-slate-800/30'}`}>
+                                        <input
+                                          type="radio"
+                                          name={`name-fix-${fix.id}`}
+                                          checked={selected}
+                                          onChange={() => setNameChoice(prev => ({ ...prev, [fix.id]: opt.value }))}
+                                          className="mt-0.5 flex-shrink-0 accent-indigo-500"
+                                        />
+                                        <div>
+                                          <p className="text-xs font-semibold text-white">{opt.value}</p>
+                                          <p className="text-[10px] text-slate-400">{opt.desc}</p>
+                                        </div>
+                                      </label>
+                                    )
+                                  })}
+                                </div>
+                                <div className="flex gap-2 mt-1">
+                                  <button onClick={() => assignName(fix.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-white transition" style={{ background: G }}>
+                                    <i className="fas fa-check"></i> Assign Legal Hold
+                                  </button>
+                                  <button onClick={() => skipFix(fix.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-[#A0AEC0] border border-[#4A5568] hover:border-[#718096] transition" style={{ background: 'transparent' }}>
+                                    <i className="fas fa-times"></i> Skip
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* ── Splits: preview table then confirm ── */}
+                            {fix.type === 'normalize_splits' && (
+                              <div className="space-y-2">
+                                {!rescalePreview && (
+                                  <div className="flex gap-2">
+                                    <button onClick={() => buildRescalePreview(fix.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-white transition" style={{ background: G }}>
+                                      <i className="fas fa-table"></i> Preview Rescaling
+                                    </button>
+                                    <button onClick={() => skipFix(fix.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-[#A0AEC0] border border-[#4A5568] hover:border-[#718096] transition" style={{ background: 'transparent' }}>
+                                      <i className="fas fa-times"></i> Skip
+                                    </button>
+                                  </div>
+                                )}
+                                {rescalePreview?.fixId === fix.id && (
+                                  <div className="space-y-2">
+                                    <div className="overflow-x-auto rounded-lg border border-slate-700">
+                                      <table className="w-full text-xs">
+                                        <thead className="bg-slate-800">
+                                          <tr className="text-slate-400">
+                                            <th className="text-left px-3 py-2">Contributor</th>
+                                            <th className="text-right px-3 py-2">Original</th>
+                                            <th className="text-right px-3 py-2">Rescaled</th>
+                                            <th className="text-right px-3 py-2">Change</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-700">
+                                          {rescalePreview.rows.map((r, ri) => (
+                                            <tr key={ri}>
+                                              <td className="px-3 py-2 text-slate-200">{r.name}</td>
+                                              <td className="px-3 py-2 text-right text-slate-400 font-mono">{r.original}%</td>
+                                              <td className="px-3 py-2 text-right text-green-300 font-mono font-semibold">{r.rescaled}%</td>
+                                              <td className={`px-3 py-2 text-right font-mono ${r.change < 0 ? 'text-red-400' : 'text-green-400'}`}>
+                                                {r.change > 0 ? '+' : ''}{r.change}%
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                    <div className="p-2.5 bg-orange-900/30 border border-orange-500/30 rounded-lg">
+                                      <p className="text-[10px] text-orange-300">⚠️ Rescaling will invalidate all prior digital handshakes. All contributors must re-verify adjusted percentages via the SMPT portal before export.</p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <button onClick={confirmRescale} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-white transition" style={{ background: G }}>
+                                        <i className="fas fa-check"></i> Accept Rescaling
+                                      </button>
+                                      <button onClick={() => setRescalePreview(null)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-[#A0AEC0] border border-[#4A5568] hover:border-[#718096] transition" style={{ background: 'transparent' }}>
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                          </div>
+                        )}
+                        {fix.status === 'accepted' && (
+                          <span className="text-xs font-semibold" style={{ color: '#68D391' }}>✓ Applied</span>
+                        )}
+                        {fix.status === 'skipped' && (
+                          <span className="text-xs font-semibold text-[#718096]">⏭ Skipped</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Split Preview */}
+            {/* Split preview */}
             {currentData.length > 0 && (
               <div className="mt-4">
-                <div className="bg-gray-50 rounded-xl p-5">
-                  <div className="flex justify-between items-center pb-3 border-b border-gray-200 mb-3">
-                    <span className="font-semibold text-indigo-900">Summer Nights EP</span>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      errors.length > 0 
-                        ? 'bg-red-100 text-red-600' 
-                        : 'bg-green-100 text-green-700'
-                    }`}>
-                      {errors.length > 0 ? `${errors.length} issues` : 'Ready'}
+                <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-5">
+                  <div className="flex justify-between items-center pb-3 border-b border-[#E2E8F0] mb-3">
+                    <span className="font-semibold" style={{ color: G }}>Split Preview</span>
+                    <span
+                      className="text-xs px-2 py-1 rounded-full font-medium"
+                      style={errors.length > 0
+                        ? { background: '#FEE2E2', color: '#C53030' }
+                        : { background: '#DEF7E5', color: G }}
+                    >
+                      {errors.length > 0 ? `${errors.length} issues` : '✓ Ready'}
                     </span>
                   </div>
-                  
-                  <div className="space-y-3">
+
+                  {/* Editable contributor rows */}
+                  <div className="space-y-2">
                     {currentData.map((item, i) => {
-                      const hasError = errors.some(e => 
-                        e.message.includes(item.name) || 
-                        (e.message.includes('missing') && !item.name)
+                      const hasError = errors.some(e =>
+                        e.message.includes(item.name) || (e.message.includes('missing') && !item.name)
                       )
                       return (
-                        <div key={i} className={`flex justify-between items-center py-2 ${hasError ? 'bg-red-50 -mx-5 px-5' : ''}`}>
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center font-semibold text-indigo-900">
-                              {item.name?.[0] || '?'}
+                        <div key={i} className={`rounded-xl border p-3 transition ${hasError ? 'border-red-300 bg-red-50' : 'border-[#E2E8F0] bg-white'}`}>
+                          <div className="grid grid-cols-2 gap-2 mb-2">
+                            <div>
+                              <label className="text-[10px] font-bold text-[#4A5568] uppercase tracking-wider">Name</label>
+                              <input
+                                value={item.name}
+                                onChange={e => updateContributor(i, 'name', e.target.value)}
+                                placeholder="Full legal name"
+                                className="w-full mt-0.5 px-3 py-1.5 text-sm border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-[#2B6F4B] bg-white text-[#1A202C]"
+                              />
                             </div>
                             <div>
-                              <div className="font-medium text-sm">{item.name || 'Unknown'}</div>
-                              <div className="text-xs text-gray-500">{item.role} · IPI: {item.ipi || 'Missing'}</div>
+                              <label className="text-[10px] font-bold text-[#4A5568] uppercase tracking-wider">Role</label>
+                              <select
+                                value={item.role}
+                                onChange={e => updateContributor(i, 'role', e.target.value)}
+                                className="w-full mt-0.5 px-3 py-1.5 text-sm border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-[#2B6F4B] bg-white text-[#1A202C]"
+                              >
+                                {['Composer','Lyricist','Producer','Arranger','Publisher','Writer'].map(r => (
+                                  <option key={r} value={r}>{r}</option>
+                                ))}
+                              </select>
                             </div>
                           </div>
-                          <span className={`font-semibold ${hasError ? 'text-red-600' : 'text-indigo-900'}`}>
-                            {item.percentage}%
-                          </span>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[10px] font-bold text-[#4A5568] uppercase tracking-wider">IPI Number</label>
+                              <input
+                                value={item.ipi}
+                                onChange={e => updateContributor(i, 'ipi', e.target.value)}
+                                placeholder="00000000000"
+                                className="w-full mt-0.5 px-3 py-1.5 text-sm border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-[#2B6F4B] bg-white font-mono text-[#1A202C]"
+                              />
+                            </div>
+                            <div className="flex gap-2 items-end">
+                              <div className="flex-1">
+                                <label className="text-[10px] font-bold text-[#4A5568] uppercase tracking-wider">Split %</label>
+                                <div className="relative mt-0.5">
+                                  <input
+                                    type="number"
+                                    value={item.percentage || ''}
+                                    onChange={e => updateContributor(i, 'percentage', parseFloat(e.target.value) || 0)}
+                                    placeholder="0"
+                                    min="0"
+                                    max="100"
+                                    step="0.01"
+                                    className="w-full px-3 pr-8 py-1.5 text-sm border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-[#2B6F4B] bg-white text-[#1A202C] font-semibold"
+                                  />
+                                  <span className="absolute right-3 top-1.5 text-sm text-[#4A5568] font-bold">%</span>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => removeContributor(i)}
+                                className="mb-0.5 w-8 h-8 flex items-center justify-center rounded-lg border border-red-200 text-red-400 hover:bg-red-50 hover:text-red-600 transition text-base flex-shrink-0"
+                                title="Remove"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       )
                     })}
                   </div>
-                  
-                  <div className="mt-3 text-right text-sm">
-                    <span className="font-medium">
-                      {currentData.reduce((sum, item) => sum + (item.percentage || 0), 0)}% total
+
+                  <button
+                    onClick={addContributor}
+                    className="w-full mt-3 py-2 text-sm font-semibold rounded-xl border-2 border-dashed border-[#CBD5E0] text-[#4A5568] hover:border-[#2B6F4B] hover:text-[#2B6F4B] transition"
+                  >
+                    + Add Contributor
+                  </button>
+
+                  <div className="mt-3 pt-3 border-t border-[#E2E8F0] flex justify-between items-center text-sm">
+                    <span className="text-[#4A5568] text-xs">{currentData.length} contributor{currentData.length !== 1 ? 's' : ''}</span>
+                    <span className={`font-bold ${Math.abs(currentData.reduce((s, x) => s + (x.percentage || 0), 0) - 100) < 0.1 ? '' : 'text-[#C53030]'}`}>
+                      {currentData.reduce((s, x) => s + (x.percentage || 0), 0).toFixed(2)}% total
                     </span>
                   </div>
                 </div>
 
-                {/* Action Buttons */}
                 {errors.length === 0 && currentStep < 3 && (
-                  <button 
+                  <button
                     onClick={startVerification}
-                    className="w-full bg-indigo-900 text-white py-3 rounded-full font-medium flex items-center justify-center gap-2 hover:bg-indigo-800 transition mt-4"
+                    className="w-full text-white py-3 rounded-full font-medium flex items-center justify-center gap-2 transition mt-4"
+                    style={{ background: G }}
+                    onMouseOver={e => (e.currentTarget.style.background = GH)}
+                    onMouseOut={e => (e.currentTarget.style.background = G)}
                   >
-                    <i className="fas fa-shield-alt"></i>
-                    Start Verification
+                    <i className="fas fa-shield-alt"></i> Start Verification
                   </button>
                 )}
               </div>
             )}
           </div>
 
-          {/* RIGHT PANEL: VERIFY + PAYMENT */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm">
-            <h2 className="text-xl font-semibold text-indigo-900 mb-6 flex items-center gap-2">
-              <i className="fas fa-check-circle text-indigo-900"></i>
-              Steps 2-4: Verify & Calculate Payment
+          {/* RIGHT: Verify + Payment */}
+          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-8 shadow-sm">
+            <h2 className="text-xl font-semibold mb-6 flex items-center gap-2" style={{ color: G }}>
+              <i className="fas fa-check-circle"></i>
+              Steps 2–4: Verify & Calculate
             </h2>
 
-            {/* Verification Record */}
+            {/* Verification record */}
             {currentStep >= 3 && currentData.length > 0 && errors.length === 0 && (
-              <div className="bg-gray-50 rounded-xl p-5 mb-4">
-                <h3 className="font-semibold text-indigo-900 mb-4">Verification Record</h3>
-                
+              <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-5 mb-4">
+                <h3 className="font-semibold mb-4" style={{ color: G }}>Verification Record</h3>
                 <div className="space-y-3">
-                  <div className="flex justify-between items-center py-2 border-b border-gray-200">
-                    <span className="text-gray-500 text-sm flex items-center gap-2">
+                  <div className="flex justify-between items-center py-2 border-b border-[#E2E8F0]">
+                    <span className="text-[#4A5568] text-sm flex items-center gap-2">
                       <i className="fas fa-fingerprint"></i> Verification ID
                     </span>
-                    <span className="font-medium text-sm">{verificationId.substring(0, 10)}...{verificationId.substring(verificationId.length - 4)}</span>
+                    <span className="font-medium text-sm">{verificationId.substring(0, 10)}…{verificationId.slice(-4)}</span>
                   </div>
-                  
-                  <div className="font-mono text-xs bg-white p-3 rounded-lg border border-gray-200 break-all">
+                  <div className="font-mono text-xs bg-white text-[#4A5568] p-3 rounded-lg border border-[#E2E8F0] break-all">
                     {verificationId}
                   </div>
-
-                  <div className="flex justify-between items-center py-2 border-b border-gray-200">
-                    <span className="text-gray-500 text-sm flex items-center gap-2">
-                      <i className="fas fa-clock"></i> Timestamp
-                    </span>
+                  <div className="flex justify-between items-center py-2 border-b border-[#E2E8F0]">
+                    <span className="text-[#4A5568] text-sm flex items-center gap-2"><i className="fas fa-clock"></i> Timestamp</span>
                     <span className="font-medium text-sm">{timestamp}</span>
                   </div>
-
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-gray-500 text-sm flex items-center gap-2">
-                      <i className="fas fa-check-circle text-green-600"></i> Status
+                  <div className="flex justify-between items-center py-2 border-b border-[#E2E8F0]">
+                    <span className="text-[#4A5568] text-sm flex items-center gap-2">
+                      <i className="fas fa-check-circle text-[#2B6F4B]"></i> Status
                     </span>
-                    <span className="text-green-600 font-medium text-sm">Verified ✓</span>
+                    <span className="font-medium text-sm" style={{ color: G }}>Verified ✓</span>
                   </div>
-
-                  {/* System Reference */}
-                  <div className="text-xs text-gray-400 pt-2 border-t border-gray-200">
-                    <span>System reference: 0xAa19...B2ea4</span>
-                    <button 
-                      onClick={() => setShowTechDetails(!showTechDetails)}
-                      className="float-right hover:text-indigo-900"
-                    >
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {['ASCAP', 'BMI', 'SESAC', 'SoundExchange'].map(pro => (
+                      <span key={pro} className="px-2 py-1 text-xs rounded-full border font-medium" style={{ background: '#DEF7E5', color: G, borderColor: '#9AE6B4' }}>
+                        {pro}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="text-xs text-[#A0AEC0] pt-2 border-t border-[#E2E8F0] flex justify-between items-center">
+                    <span>System ref: 0xAa19…B2ea4</span>
+                    <button onClick={() => setShowTechDetails(v => !v)} className="hover:text-[#2B6F4B] transition">
                       {showTechDetails ? 'Hide details ↑' : 'Show details ↓'}
                     </button>
                   </div>
-                  
-                  {/* Technical details */}
                   {showTechDetails && (
-                    <div className="text-xs text-gray-400 mt-2">
+                    <div className="text-xs text-[#4A5568] space-y-1">
                       <div>Contract: 0xAa19bFC7Bd852efe49ef31297bB082FB044B2ea4</div>
                       <div>Network: Monad Testnet (Chain ID: 10143)</div>
                     </div>
@@ -636,154 +903,158 @@ export default function VerifySplitsPage() {
               </div>
             )}
 
-            {/* Payment Input Section */}
+            {/* Payment input */}
             {currentStep >= 3 && currentData.length > 0 && errors.length === 0 && (
-              <div className="bg-gray-50 rounded-xl p-5 mb-4">
-                <h3 className="font-semibold text-indigo-900 mb-4 flex items-center gap-2">
-                  <i className="fas fa-calculator"></i>
-                  Enter Payment Amount
+              <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-5 mb-4">
+                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: G }}>
+                  <i className="fas fa-calculator"></i> Enter Payment Amount
                 </h3>
-                
                 <div className="flex gap-3 items-center">
                   <div className="flex-1 relative">
-                    <span className="absolute left-4 top-3.5 text-gray-500 font-medium">$</span>
-                    <input 
-                      type="number" 
+                    <span className="absolute left-4 top-3.5 text-[#4A5568] font-medium">$</span>
+                    <input
+                      type="number"
                       value={grossAmount}
                       min="0"
                       step="1000"
-                      onChange={(e) => setGrossAmount(parseFloat(e.target.value) || 0)}
-                      className="w-full pl-8 pr-4 py-3 border border-gray-200 rounded-full text-lg font-semibold focus:outline-none focus:border-indigo-900"
+                      onChange={e => setGrossAmount(parseFloat(e.target.value) || 0)}
+                      className="w-full pl-8 pr-4 py-3 border border-[#E2E8F0] rounded-full text-lg font-semibold focus:outline-none bg-white text-[#1A202C]"
+                      onFocus={e => (e.currentTarget.style.borderColor = G)}
+                      onBlur={e => (e.currentTarget.style.borderColor = '#E2E8F0')}
                     />
                   </div>
-                  <button 
+                  <button
                     onClick={calculateAndShowPayment}
-                    className="bg-indigo-900 text-white px-6 py-3 rounded-full font-medium hover:bg-indigo-800 transition flex items-center gap-2"
+                    className="text-white px-6 py-3 rounded-full font-medium transition flex items-center gap-2"
+                    style={{ background: G }}
+                    onMouseOver={e => (e.currentTarget.style.background = GH)}
+                    onMouseOut={e => (e.currentTarget.style.background = G)}
                   >
-                    <i className="fas fa-sync-alt"></i>
-                    Calculate
+                    <i className="fas fa-sync-alt"></i> Calculate
                   </button>
                 </div>
-                
-                <div className="mt-3 text-xs text-gray-500">
-                  <i className="fas fa-info-circle text-indigo-900"></i> Enter any amount and we'll calculate the split with 25% Swedish tax withholding
+                <p className="mt-2 text-xs text-[#4A5568]">
+                  <i className="fas fa-info-circle" style={{ color: G }}></i>
+                  &nbsp;Georgia state tax (5.49%) applied per O.C.G.A. § 48-7-26
+                </p>
+                <div className="text-center mt-3">
+                  <button
+                    onClick={downloadPaymentPDF}
+                    className="text-sm text-[#4A5568] hover:text-[#2B6F4B] transition flex items-center gap-1.5 mx-auto"
+                  >
+                    <i className="fas fa-arrow-right text-xs"></i>
+                    Skip — Download PDF without calculation
+                  </button>
                 </div>
               </div>
             )}
 
-            {/* Payment Summary */}
+            {/* Payment summary */}
             {currentStep >= 4 && (
-              <div className="bg-green-50 border border-green-200 rounded-xl p-5">
+              <div className="border border-[#9AE6B4] rounded-xl p-5" style={{ background: '#F0F9F4' }}>
                 <div className="flex justify-between items-center mb-4">
-                  <span className="font-semibold text-indigo-900 flex items-center gap-2">
+                  <span className="font-semibold flex items-center gap-2" style={{ color: G }}>
                     <i className="fas fa-credit-card"></i> Payment Summary
                   </span>
-                  <span className="text-2xl font-bold text-indigo-900">
-                    ${grossAmount.toLocaleString()}
-                  </span>
+                  <span className="text-2xl font-bold" style={{ color: G }}>${grossAmount.toLocaleString()}</span>
                 </div>
 
-                <div className="bg-white rounded-lg p-4 mb-3">
-                  <div className="flex justify-between py-2 border-b border-gray-100">
-                    <span className="text-gray-500">Gross Royalties</span>
+                <div className="bg-white rounded-lg p-4 mb-3 border border-[#E2E8F0]">
+                  <div className="flex justify-between py-2 border-b border-[#E2E8F0]">
+                    <span className="text-[#4A5568]">Gross Royalties</span>
                     <span className="font-semibold">${grossAmount.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between py-2 border-b border-gray-100">
-                    <span className="text-gray-500">Swedish Tax Withholding (25%)</span>
-                    <span className="font-semibold text-red-600">-${taxAmount.toLocaleString()}</span>
+                  <div className="flex justify-between py-2 border-b border-[#E2E8F0]">
+                    <span className="text-[#4A5568]">{TAX_LABEL}</span>
+                    <span className="font-semibold text-[#C53030]">-${taxAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
                   </div>
                   <div className="flex justify-between py-2">
-                    <span className="text-gray-500">Net Payment</span>
-                    <span className="font-semibold text-indigo-900 text-lg">${netAmount.toLocaleString()}</span>
+                    <span className="text-[#4A5568]">Net Payment</span>
+                    <span className="font-semibold text-lg" style={{ color: G }}>${netAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
                   </div>
                 </div>
 
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-800 flex items-center gap-2 mb-4">
-                  <i className="fas fa-info-circle"></i>
-                  <span>25% tax withholding automatically calculated for Swedish payees</span>
+                <div className="bg-red-50 border border-red-100 rounded-lg p-3 text-xs text-[#C53030] flex items-start gap-2 mb-4">
+                  <i className="fas fa-info-circle mt-0.5 flex-shrink-0"></i>
+                  <span>Georgia state income tax (5.49%) withheld per O.C.G.A. § 48-7-26. Federal withholding may apply separately.</span>
                 </div>
 
-                <div>
-                  <h4 className="text-sm font-medium mb-3">Distribution by Contributor</h4>
-                  <div className="space-y-3">
-                    {getDistribution().map((item, i) => (
-                      <div key={i} className="flex justify-between items-center py-2 border-b border-gray-200 border-dashed">
-                        <div className="flex items-center gap-2">
-                          <i className="fas fa-user-circle text-indigo-900"></i>
-                          <span className="text-sm">{item.name} ({item.percentage}%)</span>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-semibold text-indigo-900">${item.grossShare.toLocaleString()}</div>
-                          <div className="text-xs text-red-600">-${item.taxShare.toLocaleString()} tax</div>
-                          <div className="text-xs text-indigo-900 font-medium">${item.netShare.toLocaleString()} net</div>
-                        </div>
+                <h4 className="text-sm font-semibold text-[#1A202C] mb-3">Distribution by Contributor</h4>
+                <div className="space-y-3">
+                  {getDistribution().map((item, i) => (
+                    <div key={i} className="flex justify-between items-center py-2 border-b border-dashed border-[#E2E8F0]">
+                      <div className="flex items-center gap-2">
+                        <i className="fas fa-user-circle" style={{ color: G }}></i>
+                        <span className="text-sm">{item.name} ({item.percentage}%)</span>
                       </div>
-                    ))}
-                  </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-sm" style={{ color: G }}>${item.grossShare.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+                        <div className="text-xs text-[#C53030]">-${item.taxShare.toLocaleString(undefined, { maximumFractionDigits: 2 })} tax</div>
+                        <div className="text-xs font-medium" style={{ color: G }}>${item.netShare.toLocaleString(undefined, { maximumFractionDigits: 2 })} net</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
-                {/* Download PDF Button */}
-                <button 
+                <button
                   onClick={downloadPaymentPDF}
-                  className="w-full bg-indigo-900 text-white py-3 rounded-full font-medium flex items-center justify-center gap-2 hover:bg-indigo-800 transition mt-4"
+                  className="w-full text-white py-3 rounded-full font-medium flex items-center justify-center gap-2 transition mt-4"
+                  style={{ background: G }}
+                  onMouseOver={e => (e.currentTarget.style.background = GH)}
+                  onMouseOut={e => (e.currentTarget.style.background = G)}
                 >
-                  <i className="fas fa-file-pdf"></i>
-                  Download Payment Report (PDF)
+                  <i className="fas fa-file-pdf"></i> Download Payment Report (PDF)
                 </button>
               </div>
             )}
 
-            {/* Action Buttons */}
             {currentStep === 3 && currentData.length > 0 && errors.length === 0 && (
-              <button 
+              <button
                 onClick={() => setCurrentStep(4)}
-                className="w-full bg-indigo-900 text-white py-3 rounded-full font-medium flex items-center justify-center gap-2 hover:bg-indigo-800 transition mt-4"
+                className="w-full text-white py-3 rounded-full font-medium flex items-center justify-center gap-2 transition mt-4"
+                style={{ background: G }}
+                onMouseOver={e => (e.currentTarget.style.background = GH)}
+                onMouseOut={e => (e.currentTarget.style.background = G)}
               >
-                <i className="fas fa-calculator"></i>
-                Calculate Payment
+                <i className="fas fa-calculator"></i> Calculate Payment
               </button>
             )}
-            
+
             {currentStep === 4 && (
-              <button 
+              <button
                 onClick={resetWorkflow}
-                className="w-full bg-white border border-gray-200 text-gray-600 py-3 rounded-full font-medium flex items-center justify-center gap-2 hover:border-indigo-900 hover:text-indigo-900 transition mt-4"
+                className="w-full bg-white border border-[#E2E8F0] text-[#4A5568] py-3 rounded-full font-medium flex items-center justify-center gap-2 hover:border-[#2B6F4B] transition mt-4"
               >
-                <i className="fas fa-redo"></i>
-                Start New Verification
+                <i className="fas fa-redo"></i> Start New Verification
               </button>
             )}
           </div>
         </div>
 
-        {/* Trust Signals */}
-        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 my-8">
+        {/* Trust signals */}
+        <div className="bg-white border border-[#E2E8F0] rounded-2xl p-6 my-8 shadow-sm">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-            <div>
-              <i className="fas fa-check-circle text-indigo-900 mb-2"></i>
-              <div className="font-medium text-sm">Blockchain Verified</div>
-            </div>
-            <div>
-              <i className="fas fa-check-circle text-indigo-900 mb-2"></i>
-              <div className="font-medium text-sm">Court-Admissible</div>
-            </div>
-            <div>
-              <i className="fas fa-check-circle text-indigo-900 mb-2"></i>
-              <div className="font-medium text-sm">PRO Cross-Referenced</div>
-            </div>
-            <div>
-              <i className="fas fa-check-circle text-indigo-900 mb-2"></i>
-              <div className="font-medium text-sm">Tax-Ready</div>
-            </div>
+            {[
+              { icon: 'fa-link',                label: 'Blockchain Verified' },
+              { icon: 'fa-gavel',               label: 'Court-Admissible' },
+              { icon: 'fa-music',               label: 'PRO Cross-Referenced' },
+              { icon: 'fa-file-invoice-dollar', label: 'Georgia Tax-Ready' },
+            ].map(t => (
+              <div key={t.label}>
+                <i className={`fas ${t.icon} text-xl mb-2`} style={{ color: G }}></i>
+                <div className="font-medium text-sm text-[#1A202C]">{t.label}</div>
+              </div>
+            ))}
           </div>
         </div>
 
         {/* Footer */}
-        <footer className="border-t border-gray-200 py-8 mt-12 text-center text-gray-500">
+        <footer className="border-t border-[#E2E8F0] py-8 mt-8 text-center text-[#4A5568]">
           <p className="text-sm">TrapRoyaltiesPro ensures split accuracy, payment verification, and blockchain-proof ownership records.</p>
-          <div className="flex justify-center gap-8 mt-4 text-xs">
+          <div className="flex justify-center flex-wrap gap-6 mt-4 text-xs text-[#A0AEC0]">
             <span>© 2026 TrapRoyaltiesPro</span>
-            <span>ASCAP · BMI · SOCAN Compatible</span>
+            <span>ASCAP · BMI · SESAC · SoundExchange Compatible</span>
+            <span>Georgia Law Compliant · O.C.G.A. § 48-7-26</span>
             <span>Built for Music Attorneys</span>
           </div>
         </footer>

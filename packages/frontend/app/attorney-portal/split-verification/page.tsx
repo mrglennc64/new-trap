@@ -3,9 +3,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import * as XLSX from 'xlsx'
-import { jsPDF } from 'jspdf'
-import html2canvas from 'html2canvas'
+import { useDemoMode } from '../../lib/DemoModeProvider'
 
 // Types
 interface Contributor {
@@ -17,6 +15,15 @@ interface Contributor {
 
 interface Error {
   message: string
+}
+
+interface FixSuggestion {
+  id: string
+  issue: string
+  suggestion: string
+  status: 'pending' | 'accepted' | 'skipped'
+  type: 'fill_name' | 'fill_ipi' | 'normalize_splits'
+  contributorIndex?: number
 }
 
 interface AtlantaDistributionResult {
@@ -44,6 +51,7 @@ interface AtlantaCalculationResult {
 type Step = 1 | 2 | 3 | 4
 
 export default function VerifySplitsPage() {
+  const { demoMode } = useDemoMode()
   // State Management
   const [currentData, setCurrentData] = useState<Contributor[]>([])
   const [errors, setErrors] = useState<Error[]>([])
@@ -123,16 +131,16 @@ export default function VerifySplitsPage() {
 
   // Sample data
   const PERFECT_SAMPLE: Contributor[] = [
-    { name: "Drik Svensson", role: "Composer", percentage: 50, ipi: "00624789341" },
-    { name: "Anna Deng", role: "Lyricist", percentage: 30, ipi: "00472915682" },
-    { name: "Lars Johansson", role: "Producer", percentage: 20, ipi: "00836125497" }
+    { name: "Marcus Johnson", role: "Composer", percentage: 50, ipi: "00624789341" },
+    { name: "Deja Williams",  role: "Lyricist",  percentage: 30, ipi: "00472915682" },
+    { name: "Troy Bennett",   role: "Producer",  percentage: 20, ipi: "00836125497" }
   ]
 
   const ERROR_SAMPLE: Contributor[] = [
-    { name: "Drik Svensson", role: "Composer", percentage: 60, ipi: "" },
-    { name: "", role: "Lyricist", percentage: 25, ipi: "00472915682" },
-    { name: "Lars Johansson", role: "Producer", percentage: 20, ipi: "invalid" },
-    { name: "Extra", role: "Writer", percentage: 10, ipi: "" }
+    { name: "Marcus Johnson", role: "Composer", percentage: 60, ipi: "" },
+    { name: "",               role: "Lyricist",  percentage: 25, ipi: "00472915682" },
+    { name: "Troy Bennett",   role: "Producer",  percentage: 20, ipi: "invalid" },
+    { name: "Extra Writer",   role: "Writer",    percentage: 10, ipi: "" }
   ]
 
   // Initialize timestamp on mount
@@ -215,6 +223,11 @@ export default function VerifySplitsPage() {
     }
   }
 
+  // Demo mode: auto-load perfect sample when active
+  useEffect(() => {
+    if (demoMode && currentData.length === 0) processData(PERFECT_SAMPLE)
+  }, [demoMode])
+
   const loadPerfectSample = () => {
     processData(PERFECT_SAMPLE)
     showToast('Perfect sample loaded - no issues detected')
@@ -225,33 +238,150 @@ export default function VerifySplitsPage() {
     showToast('Sample with issues loaded', 'error')
   }
 
-  const autoFixErrors = () => {
-    const fixedData = [...currentData]
+  // ── Inline editing ───────────────────────────────────────────
+  const startManually = () => {
+    const blank: Contributor[] = [{ name: '', role: 'Composer', percentage: 0, ipi: '' }]
+    setCurrentData(blank)
+    setErrors(validateData(blank))
+    updateStep(2)
+    setShowFixPanel(false)
+    setFixes([])
+  }
 
-    // Fix missing names and IPIs
-    fixedData.forEach((item, i) => {
-      if (!item.name || item.name === '') item.name = `Contributor ${i + 1}`
-      if (!item.ipi || item.ipi === 'invalid') item.ipi = 'Auto-generated'
+  const updateContributor = (index: number, field: keyof Contributor, value: string | number) => {
+    setCurrentData(prev => {
+      const updated = prev.map((c, i) => i === index ? { ...c, [field]: value } : c)
+      const errs = validateData(updated)
+      setErrors(errs)
+      if (errs.length === 0) updateStep(3)
+      return updated
     })
+  }
 
-    // Fix total percentage
-    const total = fixedData.reduce((sum, item) => sum + item.percentage, 0)
+  const addContributor = () => {
+    setCurrentData(prev => {
+      const updated = [...prev, { name: '', role: 'Composer', percentage: 0, ipi: '' }]
+      setErrors(validateData(updated))
+      return updated
+    })
+  }
+
+  const removeContributor = (index: number) => {
+    setCurrentData(prev => {
+      const updated = prev.filter((_, i) => i !== index)
+      setErrors(validateData(updated))
+      if (updated.length === 0) updateStep(1)
+      return updated
+    })
+  }
+
+  // ── Build per-issue fix suggestions ─────────────────────────
+  const buildFixes = (data: Contributor[]): FixSuggestion[] => {
+    const result: FixSuggestion[] = []
+    data.forEach((item, i) => {
+      if (!item.name?.trim()) {
+        result.push({
+          id: `name_${i}`,
+          issue: `Contributor ${i + 1} is missing a name`,
+          suggestion: `Assign a Legal Identity Hold — prevents invalid SoundExchange filing with unnamed contributor`,
+          status: 'pending', type: 'fill_name', contributorIndex: i,
+        })
+      }
+      if (!item.ipi?.trim() || item.ipi === 'invalid') {
+        result.push({
+          id: `ipi_${i}`,
+          issue: `${item.name || `Contributor ${i + 1}`} is missing a valid IPI/ISWC`,
+          suggestion: `Search MusicBrainz IPI registry to assign a verified IPI — "AUTO-IPI" placeholders are rejected by SoundExchange`,
+          status: 'pending', type: 'fill_ipi', contributorIndex: i,
+        })
+      }
+    })
+    const total = data.reduce((s, x) => s + (x.percentage || 0), 0)
     if (Math.abs(total - 100) > 0.1) {
-      const factor = 100 / total
-      fixedData.forEach(item => {
-        item.percentage = Math.round(item.percentage * factor * 10) / 10
+      result.push({
+        id: 'normalize_splits',
+        issue: `Total split is ${total.toFixed(1)}%, must equal 100%`,
+        suggestion: `Proportional rescale — each contributor's share stays in ratio, adjusted to sum to exactly 100%`,
+        status: 'pending', type: 'normalize_splits',
       })
     }
+    return result
+  }
 
-    const validationErrors = validateData(fixedData)
-    setErrors(validationErrors)
-    setCurrentData(fixedData)
+  const handleShowFixes = () => {
+    if (!showFixPanel) setFixes(buildFixes(currentData))
+    setShowFixPanel(v => !v)
+  }
 
-    if (validationErrors.length === 0) {
-      showToast('✅ All issues fixed automatically')
-    } else {
-      showToast('⚠️ Some issues could not be auto-fixed', 'error')
+  // ── IPI: MusicBrainz search ───────────────────────────────────
+  const searchIPI = async (fixId: string, contributorName: string) => {
+    if (!contributorName.trim()) return
+    setIpiSearch(prev => ({ ...prev, [fixId]: { loading: true, results: [] } }))
+    try {
+      const res = await fetch(
+        `https://musicbrainz.org/ws/2/artist/?query=name:${encodeURIComponent(contributorName)}&fmt=json&limit=8`,
+        { headers: { 'User-Agent': 'TrapRoyaltiesPro/1.0 (traproyaltiespro.com)' } }
+      )
+      const data = await res.json()
+      const results = (data.artists || [])
+        .filter((a: any) => a.ipis?.length > 0)
+        .slice(0, 5)
+        .map((a: any) => ({ name: a.name, ipi: a.ipis[0], pro: [a.type, a.disambiguation].filter(Boolean).join(' · ') }))
+      setIpiSearch(prev => ({
+        ...prev,
+        [fixId]: { loading: false, results, error: results.length === 0 ? 'No IPI records found in MusicBrainz for this name — register at your PRO directly' : undefined },
+      }))
+    } catch {
+      setIpiSearch(prev => ({ ...prev, [fixId]: { loading: false, results: [], error: 'MusicBrainz search failed' } }))
     }
+  }
+
+  const assignIPI = (fixId: string, ipi: string) => {
+    const fix = fixes.find(f => f.id === fixId)!
+    setFixes(prev => prev.map(f => f.id === fixId ? { ...f, status: 'accepted' } : f))
+    setCurrentData(prev => {
+      const updated = prev.map(x => ({ ...x }))
+      if (fix.contributorIndex !== undefined) updated[fix.contributorIndex].ipi = ipi
+      return updated
+    })
+  }
+
+  // ── Name: legal hold options ──────────────────────────────────
+  const assignName = (fixId: string) => {
+    const fix = fixes.find(f => f.id === fixId)!
+    const choice = nameChoice[fixId] || 'TBA - Identity Audit in Progress'
+    setFixes(prev => prev.map(f => f.id === fixId ? { ...f, status: 'accepted' } : f))
+    setCurrentData(prev => {
+      const updated = prev.map(x => ({ ...x }))
+      if (fix.contributorIndex !== undefined) updated[fix.contributorIndex].name = choice
+      return updated
+    })
+  }
+
+  // ── Splits: preview then confirm ─────────────────────────────
+  const buildRescalePreview = (fixId: string) => {
+    const total = currentData.reduce((s, x) => s + x.percentage, 0)
+    const scaleFactor = 100 / total
+    const rows = currentData.map(x => {
+      const rescaled = parseFloat((x.percentage * scaleFactor).toFixed(2))
+      return { name: x.name || '(unnamed)', original: x.percentage, rescaled, change: 0 }
+    })
+    const sum = rows.reduce((s, r) => s + r.rescaled, 0)
+    if (Math.abs(sum - 100) > 0.001) rows[0].rescaled = parseFloat((rows[0].rescaled + (100 - sum)).toFixed(2))
+    rows.forEach(r => { r.change = parseFloat((r.rescaled - r.original).toFixed(2)) })
+    setRescalePreview({ fixId, rows })
+  }
+
+  const confirmRescale = () => {
+    if (!rescalePreview) return
+    setFixes(prev => prev.map(f => f.id === rescalePreview.fixId ? { ...f, status: 'accepted' } : f))
+    setCurrentData(prev => prev.map((x, i) => ({ ...x, percentage: rescalePreview.rows[i]?.rescaled ?? x.percentage })))
+    setRescalePreview(null)
+    showToast('Splits rescaled — all contributors must re-verify adjusted percentages', 'error')
+  }
+
+  const skipFix = (fixId: string) => {
+    setFixes(prev => prev.map(f => f.id === fixId ? { ...f, status: 'skipped' } : f))
   }
 
   const startVerification = () => {
@@ -328,6 +458,32 @@ export default function VerifySplitsPage() {
   // Drag and drop handlers
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Fix suggestion state
+  const [showFixPanel,    setShowFixPanel]    = useState(false)
+  const [fixes,           setFixes]           = useState<FixSuggestion[]>([])
+  const [ipiSearch,       setIpiSearch]       = useState<Record<string, { loading: boolean; results: { name: string; ipi: string; pro: string }[]; error?: string }>>({})
+  const [nameChoice,      setNameChoice]      = useState<Record<string, string>>({})
+  const [rescalePreview,  setRescalePreview]  = useState<{ fixId: string; rows: { name: string; original: number; rescaled: number; change: number }[] } | null>(null)
+
+  // Re-validate after all fixes resolved
+  useEffect(() => {
+    if (fixes.length === 0) return
+    const allResolved = fixes.every(f => f.status !== 'pending')
+    if (!allResolved) return
+    setCurrentData(prev => {
+      const errs = validateData(prev)
+      setErrors(errs)
+      if (errs.length === 0) {
+        updateStep(3)
+        showToast('All issues resolved — data verified!')
+        setShowFixPanel(false)
+      } else {
+        showToast(`${errs.length} issue(s) remain after skipped fixes`, 'error')
+      }
+      return prev
+    })
+  }, [fixes])
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -539,41 +695,230 @@ export default function VerifySplitsPage() {
               />
             </div>
 
-            {/* Sample Links */}
-            <div className="text-center my-4">
-              <button 
+            {/* Demo buttons */}
+            <div className="flex gap-3 my-4">
+              <button
                 onClick={loadPerfectSample}
-                className="text-indigo-900 text-sm mx-2 font-medium hover:underline"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-indigo-200 text-indigo-900 bg-indigo-50 text-sm font-bold transition-all hover:shadow-md hover:bg-indigo-100"
               >
-                Load perfect sample
+                <span className="text-base">✅</span>
+                Load Perfect Sample
               </button>
-              <button 
+              <button
                 onClick={loadErrorSample}
-                className="text-red-600 text-sm mx-2 font-medium hover:underline"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-red-300 text-red-700 bg-red-50 text-sm font-bold transition-all hover:shadow-md hover:bg-red-100"
               >
-                Load test with errors
+                <span className="text-base">⚠️</span>
+                Load Test with Errors
               </button>
             </div>
+            <button
+              onClick={startManually}
+              className="w-full py-2.5 text-sm font-semibold rounded-xl border-2 border-dashed border-gray-300 text-gray-500 hover:border-indigo-900 hover:text-indigo-900 transition-all"
+            >
+              + Enter contributors manually
+            </button>
 
             {/* Error Panel */}
             {errors.length > 0 && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-4 my-4">
-                <div className="flex items-center gap-2 text-red-600 font-semibold mb-3">
-                  <i className="fas fa-exclamation-triangle"></i>
-                  <span>Issues Detected</span>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2 text-red-600 font-semibold">
+                    <i className="fas fa-exclamation-triangle"></i>
+                    <span>{errors.length} Issue{errors.length > 1 ? 's' : ''} Detected</span>
+                  </div>
+                  <button
+                    onClick={handleShowFixes}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-full border border-red-600 text-red-600 hover:bg-red-100 transition"
+                  >
+                    {showFixPanel ? 'Hide Fix Suggestions' : 'Show Fix Suggestions'}
+                  </button>
                 </div>
-                <div className="text-red-800 text-sm mb-3">
+                <div className="text-red-800 text-sm space-y-1 mb-3">
                   {errors.map((error, i) => (
                     <div key={i}>• {error.message}</div>
                   ))}
                 </div>
-                <button 
-                  onClick={autoFixErrors}
-                  className="bg-indigo-900 text-white px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 hover:bg-indigo-800 transition"
-                >
-                  <i className="fas fa-magic"></i>
-                  Auto-Fix Issues
-                </button>
+
+                {showFixPanel && fixes.length > 0 && (
+                  <div className="space-y-3 mt-3">
+                    {fixes.map(fix => (
+                      <div
+                        key={fix.id}
+                        className="rounded-xl p-4 border"
+                        style={{
+                          background: '#1a1a2e',
+                          borderColor: fix.status === 'accepted' ? '#68D391' : fix.status === 'skipped' ? '#4A5568' : '#2d2d4e',
+                        }}
+                      >
+                        <div className="flex items-start gap-2 mb-2">
+                          <i className="fas fa-exclamation-circle text-red-400 text-xs mt-0.5 flex-shrink-0"></i>
+                          <span className="text-red-300 text-xs">{fix.issue}</span>
+                        </div>
+                        <div className="flex items-start gap-2 mb-3">
+                          <i className="fas fa-lightbulb text-green-400 text-xs mt-0.5 flex-shrink-0"></i>
+                          <span className="text-green-300 text-xs">{fix.suggestion}</span>
+                        </div>
+
+                        {fix.status === 'pending' && (
+                          <div>
+                            {/* IPI: MusicBrainz search */}
+                            {fix.type === 'fill_ipi' && (
+                              <div className="space-y-2">
+                                {!ipiSearch[fix.id] && (
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => searchIPI(fix.id, currentData[fix.contributorIndex!]?.name || '')}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-white transition"
+                                      style={{ background: '#3B5998' }}
+                                    >
+                                      <i className="fas fa-search"></i> Search MusicBrainz IPI
+                                    </button>
+                                    <button onClick={() => skipFix(fix.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-slate-400 border border-slate-600 hover:border-slate-400 transition bg-transparent">
+                                      <i className="fas fa-times"></i> Skip
+                                    </button>
+                                  </div>
+                                )}
+                                {ipiSearch[fix.id]?.loading && (
+                                  <p className="text-xs text-slate-400 flex items-center gap-2">
+                                    <span className="inline-block w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></span>
+                                    Searching MusicBrainz IPI registry...
+                                  </p>
+                                )}
+                                {ipiSearch[fix.id]?.error && (
+                                  <div className="space-y-2">
+                                    <p className="text-xs text-orange-400">{ipiSearch[fix.id].error}</p>
+                                    <button onClick={() => skipFix(fix.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-slate-400 border border-slate-600 transition bg-transparent">
+                                      <i className="fas fa-times"></i> Skip (register IPI manually)
+                                    </button>
+                                  </div>
+                                )}
+                                {(ipiSearch[fix.id]?.results?.length ?? 0) > 0 && (
+                                  <div className="space-y-1.5">
+                                    <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Select verified IPI from registry:</p>
+                                    {ipiSearch[fix.id].results.map((r, ri) => (
+                                      <div key={ri} className="flex items-center justify-between bg-slate-800 rounded-lg px-3 py-2">
+                                        <div>
+                                          <span className="text-xs text-white font-medium">{r.name}</span>
+                                          {r.pro && <span className="text-[10px] text-slate-400 ml-2">{r.pro}</span>}
+                                          <span className="text-[10px] font-mono text-indigo-300 ml-2">IPI: {r.ipi}</span>
+                                        </div>
+                                        <button onClick={() => assignIPI(fix.id, r.ipi)} className="text-[10px] px-2 py-1 rounded font-bold text-white bg-indigo-700 hover:bg-indigo-600 transition">
+                                          Assign ✓
+                                        </button>
+                                      </div>
+                                    ))}
+                                    <button onClick={() => skipFix(fix.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-slate-400 border border-slate-600 transition bg-transparent mt-1">
+                                      <i className="fas fa-times"></i> Skip
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Name: legal hold options */}
+                            {fix.type === 'fill_name' && (
+                              <div className="space-y-2">
+                                <p className="text-[10px] text-orange-300 font-semibold">
+                                  ⚠️ IDENTITY RISK: {currentData[fix.contributorIndex!]?.percentage ?? 0}% of royalties will be frozen in the Black Box without a legal hold
+                                </p>
+                                <div className="space-y-1.5">
+                                  {[
+                                    { value: 'TBA - Identity Audit in Progress',     desc: 'Signals active search — SoundExchange holds share in escrow' },
+                                    { value: 'Anonymous (Work-for-Hire)',             desc: 'Only valid if a signed work-for-hire contract exists' },
+                                    { value: 'Disputed Identity - Escrow Requested', desc: 'Strongest hold — forces SoundExchange to collect & hold share' },
+                                  ].map(opt => {
+                                    const selected = (nameChoice[fix.id] ?? 'TBA - Identity Audit in Progress') === opt.value
+                                    return (
+                                      <label key={opt.value} className={`flex items-start gap-2.5 p-2.5 rounded-lg cursor-pointer border transition ${selected ? 'border-indigo-500/60 bg-indigo-900/20' : 'border-slate-700 bg-slate-800/30'}`}>
+                                        <input
+                                          type="radio"
+                                          name={`name-fix-${fix.id}`}
+                                          checked={selected}
+                                          onChange={() => setNameChoice(prev => ({ ...prev, [fix.id]: opt.value }))}
+                                          className="mt-0.5 flex-shrink-0 accent-indigo-500"
+                                        />
+                                        <div>
+                                          <p className="text-xs font-semibold text-white">{opt.value}</p>
+                                          <p className="text-[10px] text-slate-400">{opt.desc}</p>
+                                        </div>
+                                      </label>
+                                    )
+                                  })}
+                                </div>
+                                <div className="flex gap-2 mt-1">
+                                  <button onClick={() => assignName(fix.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-indigo-800 hover:bg-indigo-700 transition">
+                                    <i className="fas fa-check"></i> Assign Legal Hold
+                                  </button>
+                                  <button onClick={() => skipFix(fix.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-slate-400 border border-slate-600 hover:border-slate-400 transition bg-transparent">
+                                    <i className="fas fa-times"></i> Skip
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Splits: preview table then confirm */}
+                            {fix.type === 'normalize_splits' && (
+                              <div className="space-y-2">
+                                {!rescalePreview && (
+                                  <div className="flex gap-2">
+                                    <button onClick={() => buildRescalePreview(fix.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-indigo-800 hover:bg-indigo-700 transition">
+                                      <i className="fas fa-table"></i> Preview Rescaling
+                                    </button>
+                                    <button onClick={() => skipFix(fix.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-slate-400 border border-slate-600 hover:border-slate-400 transition bg-transparent">
+                                      <i className="fas fa-times"></i> Skip
+                                    </button>
+                                  </div>
+                                )}
+                                {rescalePreview?.fixId === fix.id && (
+                                  <div className="space-y-2">
+                                    <div className="overflow-x-auto rounded-lg border border-slate-700">
+                                      <table className="w-full text-xs">
+                                        <thead className="bg-slate-800">
+                                          <tr className="text-slate-400">
+                                            <th className="text-left px-3 py-2">Contributor</th>
+                                            <th className="text-right px-3 py-2">Original</th>
+                                            <th className="text-right px-3 py-2">Rescaled</th>
+                                            <th className="text-right px-3 py-2">Change</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-700">
+                                          {rescalePreview.rows.map((r, ri) => (
+                                            <tr key={ri}>
+                                              <td className="px-3 py-2 text-slate-200">{r.name}</td>
+                                              <td className="px-3 py-2 text-right text-slate-400 font-mono">{r.original}%</td>
+                                              <td className="px-3 py-2 text-right text-green-300 font-mono font-semibold">{r.rescaled}%</td>
+                                              <td className={`px-3 py-2 text-right font-mono ${r.change < 0 ? 'text-red-400' : 'text-green-400'}`}>
+                                                {r.change > 0 ? '+' : ''}{r.change}%
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                    <div className="p-2.5 bg-orange-900/30 border border-orange-500/30 rounded-lg">
+                                      <p className="text-[10px] text-orange-300">⚠️ Rescaling will invalidate all prior digital handshakes. All contributors must re-verify adjusted percentages before export.</p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <button onClick={confirmRescale} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-indigo-800 hover:bg-indigo-700 transition">
+                                        <i className="fas fa-check"></i> Accept Rescaling
+                                      </button>
+                                      <button onClick={() => setRescalePreview(null)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-slate-400 border border-slate-600 hover:border-slate-400 transition bg-transparent">
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {fix.status === 'accepted' && <span className="text-xs font-semibold text-green-400">✓ Applied</span>}
+                        {fix.status === 'skipped' && <span className="text-xs font-semibold text-slate-500">⏭ Skipped</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -592,34 +937,89 @@ export default function VerifySplitsPage() {
                     </span>
                   </div>
                   
-                  <div className="space-y-3">
+                  {/* Editable contributor rows */}
+                  <div className="space-y-2">
                     {currentData.map((item, i) => {
-                      const hasError = errors.some(e => 
-                        e.message.includes(item.name) || 
-                        (e.message.includes('missing') && !item.name)
+                      const hasError = errors.some(e =>
+                        e.message.includes(item.name) || (e.message.includes('missing') && !item.name)
                       )
                       return (
-                        <div key={i} className={`flex justify-between items-center py-2 ${hasError ? 'bg-red-50 -mx-5 px-5' : ''}`}>
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center font-semibold text-indigo-900">
-                              {item.name?.[0] || '?'}
+                        <div key={i} className={`rounded-xl border p-3 transition ${hasError ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white'}`}>
+                          <div className="grid grid-cols-2 gap-2 mb-2">
+                            <div>
+                              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Name</label>
+                              <input
+                                value={item.name}
+                                onChange={e => updateContributor(i, 'name', e.target.value)}
+                                placeholder="Full legal name"
+                                className="w-full mt-0.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-900 bg-white text-gray-900"
+                              />
                             </div>
                             <div>
-                              <div className="font-medium text-sm">{item.name || 'Unknown'}</div>
-                              <div className="text-xs text-gray-500">{item.role} · IPI: {item.ipi || 'Missing'}</div>
+                              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Role</label>
+                              <select
+                                value={item.role}
+                                onChange={e => updateContributor(i, 'role', e.target.value)}
+                                className="w-full mt-0.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-900 bg-white text-gray-900"
+                              >
+                                {['Composer','Lyricist','Producer','Arranger','Publisher','Writer'].map(r => (
+                                  <option key={r} value={r}>{r}</option>
+                                ))}
+                              </select>
                             </div>
                           </div>
-                          <span className={`font-semibold ${hasError ? 'text-red-600' : 'text-indigo-900'}`}>
-                            {item.percentage}%
-                          </span>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">IPI Number</label>
+                              <input
+                                value={item.ipi}
+                                onChange={e => updateContributor(i, 'ipi', e.target.value)}
+                                placeholder="00000000000"
+                                className="w-full mt-0.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-900 bg-white font-mono text-gray-900"
+                              />
+                            </div>
+                            <div className="flex gap-2 items-end">
+                              <div className="flex-1">
+                                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Split %</label>
+                                <div className="relative mt-0.5">
+                                  <input
+                                    type="number"
+                                    value={item.percentage || ''}
+                                    onChange={e => updateContributor(i, 'percentage', parseFloat(e.target.value) || 0)}
+                                    placeholder="0"
+                                    min="0"
+                                    max="100"
+                                    step="0.01"
+                                    className="w-full px-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-900 bg-white text-gray-900 font-semibold"
+                                  />
+                                  <span className="absolute right-3 top-1.5 text-sm text-gray-400 font-bold">%</span>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => removeContributor(i)}
+                                className="mb-0.5 w-8 h-8 flex items-center justify-center rounded-lg border border-red-200 text-red-400 hover:bg-red-50 hover:text-red-600 transition text-base flex-shrink-0"
+                                title="Remove"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       )
                     })}
                   </div>
-                  
-                  <div className="mt-3 text-right text-sm">
-                    <span className="font-medium">
-                      {currentData.reduce((sum, item) => sum + (item.percentage || 0), 0)}% total
+
+                  <button
+                    onClick={addContributor}
+                    className="w-full mt-3 py-2 text-sm font-semibold rounded-xl border-2 border-dashed border-gray-300 text-gray-500 hover:border-indigo-900 hover:text-indigo-900 transition"
+                  >
+                    + Add Contributor
+                  </button>
+
+                  <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between items-center text-sm">
+                    <span className="text-gray-500 text-xs">{currentData.length} contributor{currentData.length !== 1 ? 's' : ''}</span>
+                    <span className={`font-bold ${Math.abs(currentData.reduce((s, x) => s + (x.percentage || 0), 0) - 100) < 0.1 ? 'text-indigo-900' : 'text-red-600'}`}>
+                      {currentData.reduce((s, x) => s + (x.percentage || 0), 0).toFixed(2)}% total
                     </span>
                   </div>
                 </div>
@@ -732,6 +1132,15 @@ export default function VerifySplitsPage() {
                 
                 <div className="mt-3 text-xs text-gray-500">
                   <i className="fas fa-info-circle text-indigo-900"></i> Enter any amount and we'll calculate with GA statutory interest + legal fees
+                </div>
+                <div className="text-center mt-3">
+                  <button
+                    onClick={downloadPaymentPDF}
+                    className="text-sm text-gray-500 hover:text-indigo-900 transition flex items-center gap-1.5 mx-auto"
+                  >
+                    <i className="fas fa-arrow-right text-xs"></i>
+                    Skip — Download PDF without calculation
+                  </button>
                 </div>
               </div>
             )}

@@ -42,7 +42,7 @@ const MOCK_SPLITS = [
 ];
 
 export default function ContractsPage() {
-  const [selectedSplit, setSelectedSplit] = useState(null);
+  const [selectedSplit, setSelectedSplit] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredSplits = MOCK_SPLITS.filter(split => 
@@ -134,7 +134,7 @@ export default function ContractsPage() {
                 <div className="mb-6">
                   <h3 className="font-medium text-gray-900 mb-3">Split Participants</h3>
                   <div className="space-y-2">
-                    {selectedSplit.participants.map((p, idx) => (
+                    {selectedSplit.participants.map((p: any, idx: number) => (
                       <div key={idx} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                         <div>
                           <p className="font-medium">{p.name}</p>

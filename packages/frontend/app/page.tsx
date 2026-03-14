@@ -1,277 +1,247 @@
 "use client";
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Footer from './components/Footer';
+import { useDemoMode } from './lib/DemoModeProvider';
 
 export default function HomePage() {
-  const [scrolled, setScrolled] = useState(false);
+  const [query, setQuery] = useState('');
+  const router = useRouter();
+  const { setDemoMode } = useDemoMode();
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 50);
-    };
-    
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  const enterDemo = () => { setDemoMode(true); router.push('/gap-finder'); };
+
+  const handleScan = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = query.trim();
+    if (q) {
+      router.push(`/royalty-finder?q=${encodeURIComponent(q)}`);
+    } else {
+      router.push('/royalty-finder');
+    }
+  };
 
   return (
-    <div className="min-h-screen gradient-bg text-white">
-      {/* Navigation - UPDATED with Labels & Managers link */}
-      <nav className={`fixed w-full z-50 transition-all duration-500 ${
-        scrolled ? 'bg-black/80 backdrop-blur-xl border-b border-purple-900/50' : 'bg-transparent'
-      }`}>
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <Link href="/" className="text-2xl font-bold group">
-            <span className="neon-purple">TrapRoyalties</span>
-            <span className="text-purple-300 group-hover:text-pink-300 transition-colors">Pro</span>
-          </Link>
-          
-          {/* Updated Navigation Links */}
-          <div className="hidden md:flex items-center space-x-8">
-            <Link href="#features" className="text-gray-300 hover:text-purple-400 transition relative group">
-              Features
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-purple-400 group-hover:w-full transition-all duration-300"></span>
-            </Link>
-         
-           <Link href="/mp3-test" className="text-indigo-600 hover:text-indigo-800 font-medium">
-             🎵 Test MP3 Upload
-            </Link>      
-            {/* NEW: Labels & Managers Link */}
-            <Link href="/label" className="text-gray-300 hover:text-blue-400 transition relative group">
-              🏷️ Labels & Managers
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-400 group-hover:w-full transition-all duration-300"></span>
-            </Link>
-            
-            {/* EXISTING: For Attorneys Link */}
-            <Link href="/for-attorneys" className="text-amber-400 font-bold hover:text-amber-300 transition relative group">
-              ⚖️ For Attorneys
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-400 group-hover:w-full transition-all duration-300"></span>
-            </Link>
-            
-            {/* EXISTING: Free Audit Button */}
-            <Link href="/free-audit" className="bg-purple-600 hover:bg-purple-500 px-6 py-2 rounded-full font-semibold transition transform hover:scale-105 hover:shadow-lg hover:shadow-purple-600/50">
-              Start Free Audit
-            </Link>
-          </div>
+    <div className="min-h-screen bg-[#0a0f1e] text-slate-200">
 
-          {/* Mobile menu button */}
-          <button className="md:hidden p-2 text-white">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="4" x2="20" y1="12" y2="12"/>
-              <line x1="4" x2="20" y1="6" y2="6"/>
-              <line x1="4" x2="20" y1="18" y2="18"/>
+      {/* Navigation */}
+      <nav className="fixed w-full z-50 bg-[#0a0f1e]/95 backdrop-blur border-b border-slate-800">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex justify-between items-center">
+          <Link href="/" className="text-xs font-bold tracking-widest text-slate-300 uppercase">
+            TrapRoyaltiesPro
+          </Link>
+          <div className="hidden md:flex items-center gap-8 text-sm">
+            <Link href="/royalty-finder" className="text-slate-400 hover:text-slate-200 transition">Royalty Finder</Link>
+            <Link href="/cwr-generator" className="text-slate-400 hover:text-slate-200 transition">CWR Generator</Link>
+            <Link href="/label" className="text-slate-400 hover:text-slate-200 transition">Label Portal</Link>
+            <Link href="/for-attorneys" className="text-amber-400 hover:text-amber-300 transition">For Attorneys</Link>
+            <Link href="/free-audit" className="text-indigo-400 hover:text-indigo-300 transition font-medium">Run Audit →</Link>
+          </div>
+          <button className="md:hidden p-2 text-slate-400">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/>
             </svg>
           </button>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative pt-32 pb-20 px-6">
-        <div className="max-w-7xl mx-auto text-center relative z-10">
-          {/* Floating badges */}
-          <div className="flex flex-wrap justify-center gap-4 mb-8">
-            <span className="bg-purple-900/50 backdrop-blur-sm px-4 py-2 rounded-full text-sm border border-purple-500/50 animate-pulse">
-              🔥 50K+ tracks scanned
-            </span>
-            <span className="bg-cyan-900/50 backdrop-blur-sm px-4 py-2 rounded-full text-sm border border-cyan-500/50 animate-pulse" style={{ animationDelay: '0.2s' }}>
-              ⚡ Monad-powered
-            </span>
-            <span className="bg-pink-900/50 backdrop-blur-sm px-4 py-2 rounded-full text-sm border border-pink-500/50 animate-pulse" style={{ animationDelay: '0.4s' }}>
-              🎵 Hip-hop & R&B focused
-            </span>
-          </div>
-
-          {/* Updated Hero Heading */}
-          <h1 className="text-5xl md:text-7xl font-black mb-6">
-            <span className="neon-cyan block">
-              Get Your Bag
-            </span>
-            <span className="neon-purple block text-4xl md:text-5xl mt-4">
-              From Every Stream,
-            </span>
-            <span className="neon-purple block text-4xl md:text-5xl">
-              Sync, & Performance
-            </span>
+      {/* Hero */}
+      <section className="pt-36 pb-16 px-6">
+        <div className="max-w-5xl mx-auto">
+          <p className="text-xs font-bold tracking-widest text-indigo-400 uppercase mb-4">
+            Music Rights Forensic Platform
+          </p>
+          <h1 className="text-3xl md:text-4xl font-bold text-white mb-5 leading-tight">
+            Identify, Document, and Recover<br className="hidden md:block" />
+            Unclaimed Music Royalties
           </h1>
-          
-          <p className="text-xl md:text-2xl text-gray-300 mb-10 max-w-3xl mx-auto">
-            Stop leaving money on the table. TrapRoyalties Pro scans PROs, verifies splits with 
-            <span className="text-purple-400 font-bold neon-purple"> crypto proofs</span>, and recovers your royalties — 
-            built for hip hop & R&B creators who hustle.
+          <p className="text-sm text-slate-400 mb-8 max-w-2xl leading-relaxed">
+            ISRC-level forensic analysis via MusicBrainz and ListenBrainz — confirmed data only.
+            Generates verifiable reports accepted as evidence in royalty dispute proceedings.
           </p>
-          
-          <div className="flex flex-col sm:flex-row justify-center gap-6">
-            <Link href="/free-audit" className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-5 px-10 rounded-full text-xl transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-purple-600/50">
-              Start Free Catalog Audit
-            </Link>
-            <Link href="/founding-member" className="border-2 border-purple-500 text-purple-400 hover:bg-purple-900/30 font-bold py-5 px-10 rounded-full text-xl transition transform hover:scale-105">
-              Join Royalty Accelerator
-            </Link>
-          </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-3xl mx-auto mt-16">
-            <div className="text-center group">
-              <div className="text-4xl font-bold neon-cyan group-hover:scale-110 transition">✅</div>
-              <div className="text-gray-400 text-sm">Tracks Monitored</div>
+          {/* ISRC Search */}
+          <form onSubmit={handleScan} className="flex gap-2 max-w-xl mb-3">
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="ISRC (e.g. USUM71703861) or artist name"
+              className="flex-1 px-4 py-2.5 bg-[#0f172a] border border-slate-700 text-slate-200 placeholder-slate-600 text-sm rounded focus:outline-none focus:border-indigo-500 transition"
+            />
+            <button
+              type="submit"
+              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded transition whitespace-nowrap"
+            >
+              Run Scan →
+            </button>
+          </form>
+          <p className="text-xs text-slate-600 mb-8">
+            No account required — queries SMPT global registry
+          </p>
+
+          {/* Two text links — no giant buttons */}
+          <div className="flex flex-wrap gap-6 text-sm border-t border-slate-800 pt-6">
+            <Link href="/free-audit" className="text-indigo-400 hover:text-indigo-300 underline underline-offset-4 transition">
+              Run full catalog audit
+            </Link>
+            <Link href="/for-attorneys" className="text-amber-400 hover:text-amber-300 underline underline-offset-4 transition">
+              Attorney access and documentation
+            </Link>
+            <Link href="/label" className="text-slate-400 hover:text-slate-300 underline underline-offset-4 transition">
+              Label and roster management
+            </Link>
+            <button
+              onClick={enterDemo}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-bold text-sm rounded-xl transition"
+            >
+              🎬 Try Demo Mode
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* System Capabilities — clean divided columns, no boxes */}
+      <section className="py-12 px-6 border-t border-slate-800/60">
+        <div className="max-w-5xl mx-auto">
+          <p className="text-xs font-bold tracking-widest text-slate-500 uppercase mb-6">System Capabilities</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-800">
+            <div className="py-4 md:pr-8">
+              <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Registry Sources</p>
+              <p className="text-sm text-slate-200 font-medium">MusicBrainz · ListenBrainz</p>
+              <p className="text-xs text-slate-500 mt-1">Open registries — confirmed data only. PRO verification is manual.</p>
             </div>
-            <div className="text-center group">
-              <div className="text-4xl font-bold neon-purple group-hover:scale-110 transition">✅</div>
-              <div className="text-gray-400 text-sm">Royalties Found</div>
+            <div className="py-4 md:px-8">
+              <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Processing Capacity</p>
+              <p className="text-sm text-slate-200 font-medium">10,000+ metadata records per session</p>
+              <p className="text-xs text-slate-500 mt-1">CWR v2.1 compliant output · CISAC standard</p>
             </div>
-            <div className="text-center group">
-              <div className="text-4xl font-bold text-pink-400 group-hover:scale-110 transition">✅ PROs</div>
-              <div className="text-gray-400 text-sm">ASCAP, BMI, SOCAN, PRS</div>
+            <div className="py-4 md:pl-8">
+              <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Evidence Standard</p>
+              <p className="text-sm text-slate-200 font-medium">SHA-256 verification hash per report</p>
+              <p className="text-xs text-slate-500 mt-1">Chain-of-custody documentation included</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Lawyer CTA Section */}
-      <section className="relative py-20 overflow-hidden bg-gradient-to-r from-amber-900/20 via-yellow-900/20 to-amber-900/20">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-          <span className="inline-block bg-amber-500 text-black font-bold px-4 py-2 rounded-full text-sm mb-6 animate-bounce">
-            ⚖️ ATTORNEY-EXCLUSIVE ⚖️
-          </span>
-          
-          <h2 className="text-5xl md:text-7xl font-black mb-6">
-            <span className="neon-amber">
-              STOP ROYALTY DISPUTES
-            </span>
-            <br />
-            <span className="text-white">BEFORE THEY BECOME LAWSUITS</span>
-          </h2>
-          
-          <p className="text-2xl text-gray-300 mb-12 max-w-4xl mx-auto">
-            Built specifically for <span className="text-amber-400 font-bold neon-amber">entertainment attorneys</span>. 
-            Verifiable ownership records, court-admissible audit reports, and tamper-proof blockchain evidence.
-          </p>
+      {/* Attorney Section — secure document aesthetic */}
+      <section className="py-16 px-6 border-t border-slate-700/40 bg-[#080d1a]">
+        <div className="max-w-5xl mx-auto">
 
-          <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto mb-12">
-            <div className="bg-black/60 backdrop-blur p-6 rounded-2xl border border-amber-500/30 hover:scale-105 transition-all duration-300 hover:border-amber-400 group">
-              <div className="text-4xl font-bold text-amber-400 mb-2 group-hover:scale-110 transition">✅</div>
-              <div className="text-gray-300">Black Box Royalties</div>
+          {/* Header + secure button */}
+          <div className="flex flex-col md:flex-row md:items-start gap-8 mb-10">
+            <div className="flex-1">
+              <p className="text-xs font-bold tracking-widest text-amber-500 uppercase mb-2">
+                For Entertainment Attorneys
+              </p>
+              <h2 className="text-xl font-bold text-white mb-3">
+                Forensic Documentation &amp; Chain of Custody
+              </h2>
+              <p className="text-sm text-slate-400 leading-relaxed max-w-xl">
+                Every diagnostic generates a hash-verified evidence package with immutable ownership
+                chains, split discrepancy analysis, and multi-node registry verification —
+                engineered for pre-dispute resolution and civil litigation.
+              </p>
             </div>
-            <div className="bg-black/60 backdrop-blur p-6 rounded-2xl border border-amber-500/30 hover:scale-105 transition-all duration-300 hover:border-amber-400 group">
-              <div className="text-4xl font-bold text-amber-400 mb-2 group-hover:scale-110 transition">✅</div>
-              <div className="text-gray-300">Split Error Rate</div>
-            </div>
-            <div className="bg-black/60 backdrop-blur p-6 rounded-2xl border border-amber-500/30 hover:scale-105 transition-all duration-300 hover:border-amber-400 group">
-              <div className="text-4xl font-bold text-amber-400 mb-2 group-hover:scale-110 transition">30 Days</div>
-              <div className="text-gray-300">Dispute Resolution</div>
-            </div>
-          </div>
 
-          <div className="flex flex-col md:flex-row justify-center gap-6 max-w-3xl mx-auto">
-            <Link href="/for-attorneys" className="bg-gradient-to-r from-amber-500 to-yellow-500 text-black font-bold py-6 px-12 rounded-full text-2xl hover:scale-105 transition-all duration-300 shadow-2xl flex-1">
-              ⚖️ Attorney Portal Access
-            </Link>
-            <Link href="/for-attorneys#sample" className="border-2 border-amber-500 text-amber-400 hover:bg-amber-500/10 font-bold py-6 px-12 rounded-full text-2xl transition flex-1 hover:scale-105">
-              View Sample Report
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Grid */}
-      <section id="features" className="py-24 px-6">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-5xl font-bold text-center mb-16">
-            <span className="neon-purple">Why TrapRoyalties Pro?</span>
-          </h2>
-          
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                icon: "🔍",
-                title: "PRO Scanner + Gap Finder",
-                desc: "Continuous monitoring of ASCAP, BMI, SOCAN, PRS. Uncover unclaimed royalties with verifiable records."
-              },
-              {
-                icon: "⚡",
-                title: "Crypto-Verified Splits",
-                desc: "Enforce accurate splits with blockchain proofs. Generate court-admissible documentation."
-              },
-              {
-                icon: "📋",
-                title: "Attorney-Ready Reports",
-                desc: "Every audit includes verification hash, chain of custody, and downloadable PDF for discovery."
-              }
-            ].map((feature, i) => (
-              <div key={i} className="group bg-purple-950/50 p-8 rounded-2xl border border-purple-800 hover:border-purple-500 transition-all duration-500 hover:scale-105">
-                <div className="text-5xl mb-6 group-hover:scale-110 transition-transform duration-300 animate-float" style={{ animationDelay: i * 0.2 + 's' }}>
-                  {feature.icon}
+            {/* Secure Document Button */}
+            <div className="flex-shrink-0 self-start">
+              <Link
+                href="/for-attorneys"
+                className="group flex flex-col items-center gap-1 px-5 py-4 rounded bg-[#0f1623] border border-slate-600 hover:border-violet-500/60 transition-all duration-300 shadow-lg hover:shadow-violet-900/30 text-center min-w-[220px]"
+              >
+                <div className="flex items-center gap-2 text-slate-200 text-sm font-semibold group-hover:text-white transition">
+                  {/* PDF + shield icon */}
+                  <svg className="w-4 h-4 text-slate-400 group-hover:text-violet-400 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                  </svg>
+                  View Sample Evidence Package
                 </div>
-                <h3 className="text-2xl font-bold text-purple-400 mb-4 group-hover:text-pink-400 transition">{feature.title}</h3>
-                <p className="text-gray-400">{feature.desc}</p>
-              </div>
-            ))}
+                <span className="text-[10px] text-slate-500 group-hover:text-violet-400/70 font-mono tracking-wide transition">
+                  SHA-256 · Hash Verified · PDF
+                </span>
+              </Link>
+              <p className="text-[10px] text-slate-700 text-center mt-2 font-mono">
+                Audit ID: TRP-SAMPLE-001
+              </p>
+            </div>
+          </div>
+
+          {/* Data table */}
+          <div className="border border-slate-800 rounded overflow-hidden text-sm">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-[#0f1623] border-b border-slate-800">
+                  <th className="text-left px-4 py-3 text-xs font-bold tracking-wider text-slate-500 uppercase">Forensic Service</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold tracking-wider text-slate-500 uppercase hidden md:table-cell">Data Source</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold tracking-wider text-slate-500 uppercase">Deliverable</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/70">
+                {[
+                  ['Ownership Verification', 'MusicBrainz SMPT probe', 'Signed PDF, hash-verified'],
+                  ['Split Discrepancy Analysis', 'Ledger vs. market consumption data', '15–40% avg. gap documented'],
+                  ['Forensic Discovery', 'Automated schema parsing engine', 'Minutes vs. months manually'],
+                  ['Black Box Royalties', 'ISRC + ListenBrainz gap analysis', 'Claim documentation package'],
+                  ['ISRC Gap Detection', 'Registry existence check', 'Missing registration report'],
+                  ['Automated CWR Registration', 'Multi-Node Registry Verification', 'Audit-Ready Registration File'],
+                ].map(([service, source, deliverable], i) => (
+                  <tr key={i} className="hover:bg-slate-800/20 transition">
+                    <td className="px-4 py-3 text-slate-200">{service}</td>
+                    <td className="px-4 py-3 text-slate-500 hidden md:table-cell">{source}</td>
+                    <td className="px-4 py-3 text-slate-400">{deliverable}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[11px] text-slate-700 mt-3">
+            * Audit results vary based on catalog registration status and PRO data availability.
+          </p>
+        </div>
+      </section>
+
+      {/* Access by Role — left-border text links, no big boxes */}
+      <section className="py-16 px-6 border-t border-slate-800">
+        <div className="max-w-5xl mx-auto">
+          <p className="text-xs font-bold tracking-widest text-slate-500 uppercase mb-8">Access by Role</p>
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="border-l-2 border-indigo-600 pl-4">
+              <p className="text-sm font-semibold text-slate-200 mb-1">Artists &amp; Songwriters</p>
+              <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+                ISRC lookup, PRO gap analysis, and missing royalty identification across your catalog.
+              </p>
+              <Link href="/free-audit" className="text-xs text-indigo-400 hover:text-indigo-300 transition">
+                Run free audit →
+              </Link>
+            </div>
+            <div className="border-l-2 border-blue-600 pl-4">
+              <p className="text-sm font-semibold text-slate-200 mb-1">Labels &amp; Managers</p>
+              <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+                Roster catalog management, bulk audit processing, and split verification across artists.
+              </p>
+              <Link href="/label" className="text-xs text-blue-400 hover:text-blue-300 transition">
+                Label portal →
+              </Link>
+            </div>
+            <div className="border-l-2 border-amber-500 pl-4">
+              <p className="text-sm font-semibold text-slate-200 mb-1">Entertainment Attorneys</p>
+              <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+                Court-admissible audit packages, evidence documentation, and dispute support tools.
+              </p>
+              <Link href="/for-attorneys" className="text-xs text-amber-400 hover:text-amber-300 transition">
+                Attorney access →
+              </Link>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Dual-Path CTA - UPDATED to include Labels & Managers option */}
-      <section className="py-20 px-6 bg-gradient-to-r from-purple-900/30 via-pink-900/30 to-purple-900/30">
-        <div className="max-w-5xl mx-auto text-center">
-          <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-            Who Are You?
-          </h2>
-          
-          <div className="grid md:grid-cols-3 gap-6 mt-12">
-            {/* Artists */}
-            <Link href="/free-audit" className="group">
-              <div className="bg-gradient-to-br from-purple-600 to-pink-600 p-8 rounded-2xl hover:scale-105 transition-all duration-500 border-2 border-purple-400/50">
-                <div className="text-7xl mb-4 group-hover:scale-110 transition-transform duration-300 animate-float">🎵</div>
-                <h3 className="text-2xl font-bold mb-3 text-white">I'm an Artist</h3>
-                <p className="text-purple-200 mb-6">Find missing royalties from streams, syncs, and performances.</p>
-                <span className="inline-block bg-white text-purple-900 px-6 py-2 rounded-full font-bold group-hover:bg-purple-100 transition">
-                  Free Audit →
-                </span>
-              </div>
-            </Link>
-            
-            {/* Labels & Managers - NEW */}
-            <Link href="/label" className="group">
-              <div className="bg-gradient-to-br from-blue-600 to-indigo-600 p-8 rounded-2xl hover:scale-105 transition-all duration-500 border-2 border-blue-400/50">
-                <div className="text-7xl mb-4 group-hover:scale-110 transition-transform duration-300 animate-float" style={{ animationDelay: '0.1s' }}>🏷️</div>
-                <h3 className="text-2xl font-bold mb-3 text-white">I'm a Label/Manager</h3>
-                <p className="text-blue-200 mb-6">Manage catalogs, track royalties, and verify splits across your roster.</p>
-                <span className="inline-block bg-white text-blue-900 px-6 py-2 rounded-full font-bold group-hover:bg-blue-100 transition">
-                  Label Portal →
-                </span>
-              </div>
-            </Link>
-            
-            {/* Attorneys */}
-            <Link href="/for-attorneys" className="group">
-              <div className="bg-gradient-to-br from-amber-600 to-amber-800 p-8 rounded-2xl hover:scale-105 transition-all duration-500 border-2 border-amber-400/50">
-                <div className="text-7xl mb-4 group-hover:scale-110 transition-transform duration-300 animate-float" style={{ animationDelay: '0.2s' }}>⚖️</div>
-                <h3 className="text-2xl font-bold mb-3 text-white">I'm an Attorney</h3>
-                <p className="text-amber-200 mb-6">Access court‑ready reports and audit tools built for litigation.</p>
-                <span className="inline-block bg-white text-amber-900 px-6 py-2 rounded-full font-bold group-hover:bg-amber-100 transition">
-                  Attorney Portal →
-                </span>
-              </div>
-            </Link>
-          </div>
-        </div>
-      </section>
+      <Footer />
 
-      {/* Footer */}
-      <footer className="py-12 bg-black/80 border-t border-purple-900/30 text-center text-gray-500">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex flex-wrap justify-center gap-8 mb-8">
-            <Link href="/privacy" className="hover:text-purple-400 transition">Privacy</Link>
-            <Link href="/terms" className="hover:text-purple-400 transition">Terms</Link>
-            <Link href="/label" className="text-blue-400 hover:text-blue-300 font-bold transition">🏷️ Labels & Managers</Link>
-            <Link href="/for-attorneys" className="text-amber-400 hover:text-amber-300 font-bold transition">⚖️ For Attorneys</Link>
-            <Link href="/contact" className="hover:text-purple-400 transition">Contact</Link>
-          </div>
-          <p>© 2026 TrapRoyalties Pro. Built for the culture. All rights reserved.</p>
-          <p className="text-xs text-gray-600 mt-4">ASCAP · BMI · SOCAN · PRS · Monad Blockchain</p>
-        </div>
-      </footer>
     </div>
   );
 }

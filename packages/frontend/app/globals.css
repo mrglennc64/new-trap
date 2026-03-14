@@ -34,6 +34,10 @@
   .glass-card {
     @apply bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl shadow-xl;
   }
+
+  .glass {
+    @apply bg-white/5 backdrop-blur-sm border border-white/10;
+  }
   
   .neon-text-purple {
     @apply text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400;
@@ -163,6 +167,26 @@
     @apply bg-indigo-500/50 rounded-full hover:bg-indigo-500/70 transition-colors;
   }
 }
+
+/* Dashboard animations and utilities */
+@keyframes fadeIn { from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)} }
+.fade { animation: fadeIn 0.25s ease both; }
+.mono { font-family: 'JetBrains Mono','Fira Code',monospace; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(99,102,241,.4); border-radius: 2px; }
+.leak-critical { border-left: 3px solid #ef4444; }
+.leak-warning  { border-left: 3px solid #f59e0b; }
+.leak-info     { border-left: 3px solid #3b82f6; }
+
+/* Attorney portal mono + animation classes */
+.mc-mono, .wr-mono {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+@keyframes mcPulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.mc-pulse { animation: mcPulse 2s ease infinite; }
+@keyframes mcFade { from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)} }
+.mc-fade { animation: mcFade 0.35s ease both; }
 
 /* Ensure smooth scrolling */
 html {
